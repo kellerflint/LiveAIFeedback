@@ -1,0 +1,36 @@
+# Node / Frontend
+node_modules/
+dist/
+build/
+.env.local
+.env.*.local
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+build/
+dist/
+downloads/
+.eggs/
+*.egg-info/
+*.egg
+.env
+
+# Application Specific
+backend/ai_service.log
+backend/.env
+
+# Docker
+.docker/
+
+# IDEs and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
