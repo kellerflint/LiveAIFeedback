@@ -19,6 +19,8 @@ test.describe('Session Lifecycle Management', () => {
         // Force a clean state: If there's an active session from a dead test run, end it.
         const startSessionBtn = adminPage.locator('button:has-text("Start New Session")');
         if (!(await startSessionBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+            // Wait for history table to load
+            await expect(adminPage.locator('text="Loading sessions..."')).toHaveCount(0, { timeout: 10000 });
             const endBtn = adminPage.locator('button:has-text("End Session")').first();
             if (await endBtn.isVisible()) {
                 await endBtn.click();
@@ -27,14 +29,10 @@ test.describe('Session Lifecycle Management', () => {
         await expect(startSessionBtn).toBeVisible();
 
         // 2. Start a New Session 
-        // Need to isolate the model just like other tests
-        await adminPage.click('button[title="meta-llama/llama-3-8b-instruct:free"]');
-        await expect(adminPage.locator('text="Select AI Model"')).toBeVisible();
-        await adminPage.locator('.fixed').locator('text="test-model"').click();
-
+        // Start session triggering auto-model prompt
         await adminPage.click('button:has-text("Start New Session")');
-
-        // Wait for Live Session URL
+        await expect(adminPage.locator('h3:has-text("Select AI Model")')).toBeVisible();
+        await adminPage.locator('.fixed').locator('text="test-model"').click();
         await expect(adminPage).toHaveURL(/.*\/admin\/session\/.*/);
 
         // Extract session code

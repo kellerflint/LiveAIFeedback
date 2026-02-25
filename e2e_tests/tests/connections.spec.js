@@ -26,6 +26,7 @@ test.describe('Connection Tracking via WebSockets', () => {
         // Force a clean state: If there's an active session from a dead test run, end it.
         const startSessionBtn = adminPage.locator('button:has-text("Start New Session")');
         if (!(await startSessionBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+            await expect(adminPage.locator('text="Loading sessions..."')).toHaveCount(0, { timeout: 10000 });
             const endBtn = adminPage.locator('button:has-text("End Session")').first();
             if (await endBtn.isVisible()) {
                 await endBtn.click();
@@ -33,11 +34,10 @@ test.describe('Connection Tracking via WebSockets', () => {
         }
         await expect(startSessionBtn).toBeVisible();
 
-        // Start session with isolated model
-        await adminPage.click('button[title="meta-llama/llama-3-8b-instruct:free"]');
-        await expect(adminPage.locator('text="Select AI Model"')).toBeVisible();
-        await adminPage.locator('.fixed').locator('text="test-model"').click();
+        // Start session triggering auto-model prompt
         await adminPage.click('button:has-text("Start New Session")');
+        await expect(adminPage.locator('h3:has-text("Select AI Model")')).toBeVisible();
+        await adminPage.locator('.fixed').locator('text="test-model"').click();
         await expect(adminPage).toHaveURL(/.*\/admin\/session\/.*/);
 
         // Get the session code

@@ -15,8 +15,9 @@ async def grade_response(question_text: str, grading_criteria: str, student_resp
     Returns: (score [1-4], feedback [string])
     """
     prompt = f"""
-    You are an AI teaching assistant. Score the following student response on a scale of 1 to 4 based strictly on the provided grading criteria.
-    Then, provide short, constructive feedback to the student.
+    Score the following student response on a scale of 1 to 4 based strictly on the provided grading criteria.
+    If the student does not answer the question at all or the response is entirely irrelevant, return a score of 0.
+    Provide short, constructive feedback to the student, but only if there is meaningful feedback to provide. A few sentences or less.
     
     Question: {question_text}
     Grading Criteria: {grading_criteria}

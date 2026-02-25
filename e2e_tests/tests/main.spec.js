@@ -37,6 +37,7 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
         // Force a clean state: If there's an active session from a dead test run, end it.
         const startSessionBtn = adminPage.locator('button:has-text("Start New Session")');
         if (!(await startSessionBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+            await expect(adminPage.locator('text="Loading sessions..."')).toHaveCount(0, { timeout: 10000 });
             const endBtn = adminPage.locator('button:has-text("End Session")').first();
             if (await endBtn.isVisible()) {
                 await endBtn.click();
@@ -44,11 +45,12 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
         }
         await expect(startSessionBtn).toBeVisible();
 
-        // 3. Admin starts a session with the isolated test model
-        await adminPage.click('button[title="meta-llama/llama-3.3-70b-instruct:free"]');
-        await expect(adminPage.locator('text="Select AI Model"')).toBeVisible();
-        await adminPage.locator('.fixed').locator('text="test-model"').click();
+        // 3. Admin clicks start and triggers the auto-prompt since no model is saved in this context
         await adminPage.click('button:has-text("Start New Session")');
+        await expect(adminPage.locator('h3:has-text("Select AI Model")')).toBeVisible();
+
+        // Admin picks 'test-model', which auto-starts the session via the pending state
+        await adminPage.locator('.fixed').locator('text="test-model"').click();
         await expect(adminPage).toHaveURL(/.*\/admin\/session\/.*/);
 
         // Get the session code

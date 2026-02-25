@@ -18,11 +18,12 @@ const AdminDashboard = () => {
     const [showQForm, setShowQForm] = useState(false);
 
     // AI Model Selector
-    const [selectedModel, setSelectedModel] = useState('meta-llama/llama-3.3-70b-instruct:free');
+    const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem('preferredAiModel') || '');
     const [showModelModal, setShowModelModal] = useState(false);
     const [openRouterModels, setOpenRouterModels] = useState([]);
     const [modelsLoading, setModelsLoading] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
+    const [pendingSessionStart, setPendingSessionStart] = useState(false);
 
     // Toast State
     const [toast, setToast] = useState(null);
@@ -107,11 +108,20 @@ const AdminDashboard = () => {
         }
     };
 
-    const startSession = async () => {
+    const handleModelSelect = (model) => {
+        setSelectedModel(model);
+        localStorage.setItem('preferredAiModel', model);
+        if (pendingSessionStart) {
+            setPendingSessionStart(false);
+            startSessionImpl(model);
+        }
+    };
+
+    const startSessionImpl = async (modelToUse) => {
         try {
             // The endpoint returns a primitive string for the code when doing rapid creation, 
             // but the test expects an object. Let's fix the schema but also be resilient here.
-            const res = await api.post('/admin/sessions', { ai_model: selectedModel });
+            const res = await api.post('/admin/sessions', { ai_model: modelToUse });
 
             // Check if backend returned string directly or an object with a code property
             const code = typeof res.data === 'string' ? res.data : res.data?.code;
@@ -122,6 +132,17 @@ const AdminDashboard = () => {
             console.error(error);
             setToast({ message: "Failed to create session", type: 'error' });
         }
+    };
+
+    const startSession = async () => {
+        if (!selectedModel) {
+            setPendingSessionStart(true);
+            setShowModelModal(true);
+            fetchModels();
+            setToast({ message: "Please select an AI model to continue", type: 'info' });
+            return;
+        }
+        await startSessionImpl(selectedModel);
     };
 
     return (
@@ -135,10 +156,10 @@ const AdminDashboard = () => {
                             onClick={() => { setShowModelModal(true); fetchModels(); }}
                             disabled={!!sessions.find(s => s.status === 'active')}
                             className={`text-sm border border-gray-300 rounded-lg shadow-sm px-3 py-2 flex items-center gap-2 w-[220px] ${sessions.find(s => s.status === 'active') ? 'bg-gray-100 opacity-60 cursor-not-allowed' : 'bg-white hover:bg-gray-50'}`}
-                            title={selectedModel}
+                            title={selectedModel || "Select Model"}
                         >
                             <Bot className="w-4 h-4 text-gray-500 shrink-0" />
-                            <span className="truncate flex-1 text-left">{selectedModel}</span>
+                            <span className="truncate flex-1 text-left">{selectedModel || "Select an AI Model..."}</span>
                         </button>
                     </div>
                     {sessions.find(s => s.status === 'active') ? (
@@ -304,13 +325,16 @@ const AdminDashboard = () => {
             {/* Model Search Modal */}
             <ModelSearchModal
                 show={showModelModal}
-                onClose={() => setShowModelModal(false)}
+                onClose={() => {
+                    setShowModelModal(false);
+                    setPendingSessionStart(false);
+                }}
                 modelsLoading={modelsLoading}
                 openRouterModels={openRouterModels}
                 modelSearch={modelSearch}
                 setModelSearch={setModelSearch}
                 selectedModel={selectedModel}
-                setSelectedModel={setSelectedModel}
+                setSelectedModel={handleModelSelect}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
