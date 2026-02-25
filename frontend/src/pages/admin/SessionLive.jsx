@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api';
-import { Play, Square, Users, Copy, ArrowLeft, X } from 'lucide-react';
+import { Play, Square, Users, Copy, ArrowLeft, X, Power } from 'lucide-react';
 import Toast from '../../components/Toast';
 
 const SessionLive = () => {
@@ -101,6 +101,17 @@ const SessionLive = () => {
         }
     };
 
+    const handleEndSession = async () => {
+        if (!window.confirm("Are you sure you want to end this session? Students will be disconnected.")) return;
+        try {
+            await api.put(`/admin/sessions/${session.id}/end`);
+            setSession({ ...session, status: 'closed' });
+            setToast({ message: "Session ended successfully", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to end session", type: 'error' });
+        }
+    };
+
     const copyLink = () => {
         const link = `${window.location.origin}/session/${sessionCode}`;
         navigator.clipboard.writeText(link);
@@ -118,13 +129,27 @@ const SessionLive = () => {
                     </button>
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Live Session</h1>
-                        <p className="text-sm text-green-600 font-medium flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Active
-                        </p>
+                        {session?.status === 'active' ? (
+                            <p className="text-sm text-green-600 font-medium flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Active
+                            </p>
+                        ) : (
+                            <p className="text-sm text-gray-500 font-medium flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-gray-400"></span> Closed
+                            </p>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {session?.status === 'active' && (
+                        <button
+                            onClick={handleEndSession}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition shadow-sm mr-2"
+                        >
+                            <Power className="w-4 h-4" /> End Session
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowUsersModal(true)}
                         className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-medium text-sm border border-blue-200 shadow-sm hover:bg-blue-100 transition cursor-pointer"
@@ -141,27 +166,29 @@ const SessionLive = () => {
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Sidebar: Library */}
-                <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-full overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 bg-gray-50">
-                        <h2 className="font-semibold text-gray-900">Question Library</h2>
+                {session?.status === 'active' && (
+                    <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-full overflow-hidden">
+                        <div className="p-4 border-b border-gray-200 bg-gray-50">
+                            <h2 className="font-semibold text-gray-900">Question Library</h2>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            {questions.map(q => (
+                                <div key={q.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-300 transition shadow-sm">
+                                    <p className="text-gray-900 font-medium mb-3">{q.text}</p>
+                                    <button
+                                        onClick={() => launchQuestion(q.id)}
+                                        className="w-full py-2 bg-blue-50 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm"
+                                    >
+                                        <Play className="w-4 h-4" /> Launch to Students
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {questions.map(q => (
-                            <div key={q.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-300 transition shadow-sm">
-                                <p className="text-gray-900 font-medium mb-3">{q.text}</p>
-                                <button
-                                    onClick={() => launchQuestion(q.id)}
-                                    className="w-full py-2 bg-blue-50 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm"
-                                >
-                                    <Play className="w-4 h-4" /> Launch to Students
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                )}
 
                 {/* Right Area: Results */}
-                <div className="w-2/3 flex flex-col h-full overflow-hidden bg-gray-50">
+                <div className={`${session?.status === 'active' ? 'w-2/3' : 'w-full'} flex flex-col h-full overflow-hidden bg-gray-50`}>
                     <div className="p-4 border-b border-gray-200 bg-white shadow-sm z-10">
                         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                             <Users className="w-5 h-5 text-gray-400" />

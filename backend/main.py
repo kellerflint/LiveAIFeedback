@@ -41,5 +41,5 @@ async def health_check():
 # Include routers
 app.include_router(admin_auth.router, prefix="/api/admin", tags=["Admin Auth"])
 app.include_router(questions.router, prefix="/api/admin", tags=["Questions"])
-app.include_router(admin_sessions.router, prefix="/api/admin/sessions", tags=["Admin Sessions"])
+app.include_router(admin_sessions.router, prefix="/api/admin", tags=["Admin Sessions"])
 app.include_router(student.router, prefix="/api/student", tags=["Student"])

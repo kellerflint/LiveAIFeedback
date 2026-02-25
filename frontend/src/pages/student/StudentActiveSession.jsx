@@ -32,7 +32,7 @@ const StudentActiveSession = () => {
                     sessionStorage.setItem('activeSessionId', sId);
                 } catch (error) {
                     sessionStorage.removeItem('activeSessionId');
-                    if (isMounted) navigate('/');
+                    if (isMounted) navigate('/', { state: { message: "Invalid session or session closed." } });
                     return;
                 }
             }
@@ -67,7 +67,7 @@ const StudentActiveSession = () => {
         } catch (e) {
             if (e.response?.status === 404 || e.response?.status === 400) {
                 sessionStorage.removeItem('activeSessionId');
-                navigate('/');
+                navigate('/', { state: { message: "The instructor has closed this session." } });
             }
         }
     };

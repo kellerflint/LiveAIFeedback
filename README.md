@@ -13,7 +13,6 @@ A dockerized web application for collecting and AI-grading student responses in 
     Create `backend/.env` with the following contents:
     ```env
     OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
-    SECRET_KEY=a_long_random_string_for_jwt_auth
     ```
     
     *Note: If `OPENROUTER_API_KEY` is completely missing or invalid, the backend will still function but will return mocked AI grading scores for student submissions.*

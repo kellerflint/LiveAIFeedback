@@ -32,6 +32,37 @@ class SessionRepository:
                 return await cur.fetchone()
 
     @staticmethod
+    async def get_all() -> list:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM session ORDER BY id DESC")
+                return await cur.fetchall()
+
+    @staticmethod
+    async def get_active_session() -> dict:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM session WHERE status = 'active' LIMIT 1")
+                return await cur.fetchone()
+
+    @staticmethod
+    async def close_session(session_id: int):
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("UPDATE session SET status = 'closed' WHERE id = %s", (session_id,))
+                await cur.execute("UPDATE session_question SET status = 'closed' WHERE session_id = %s", (session_id,))
+
+    @staticmethod
+    async def delete_session(session_id: int):
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("DELETE FROM session WHERE id = %s", (session_id,))
+
+    @staticmethod
     async def launch_question(session_id: int, question_id: int) -> int:
         pool = await get_db_pool()
         async with pool.acquire() as conn:

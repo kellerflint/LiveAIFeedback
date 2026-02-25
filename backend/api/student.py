@@ -61,6 +61,15 @@ async def join_session(code: str):
 
 @router.get("/session/{session_id}/active-questions")
 async def get_active_questions(session_id: int):
+    # First check if session is closed to auto-kick students
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT status FROM session WHERE id = %s", (session_id,))
+            session_data = await cur.fetchone()
+            if not session_data or session_data['status'] != 'active':
+                raise HTTPException(status_code=400, detail="This session is no longer active")
+
     # Returns the questions currently open for this session
     questions = await SessionRepository.get_active_questions(session_id)
     return questions
@@ -79,6 +88,9 @@ async def submit_response(session_id: int, question_id: int, response: StudentRe
 
     if not question or not session:
         raise HTTPException(status_code=404, detail="Question or session not found")
+        
+    if session['status'] != 'active':
+        raise HTTPException(status_code=400, detail="This session is closed")
 
     # Grade the response
     score, feedback = await grade_response(

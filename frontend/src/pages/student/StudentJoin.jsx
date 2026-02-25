@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import api from '../../api';
 
@@ -8,6 +8,14 @@ const StudentJoin = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    useEffect(() => {
+        if (location.state?.message) {
+            setError(location.state.message);
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
 
     const handleJoin = async (e) => {
         e.preventDefault();

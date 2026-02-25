@@ -7,6 +7,7 @@ import Toast from '../../components/Toast';
 
 const AdminDashboard = () => {
     const [questions, setQuestions] = useState([]);
+    const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const { logout } = React.useContext(AuthContext);
     const navigate = useNavigate();
@@ -31,8 +32,12 @@ const AdminDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const qRes = await api.get('/admin/questions');
+            const [qRes, sRes] = await Promise.all([
+                api.get('/admin/questions'),
+                api.get('/admin/sessions')
+            ]);
             setQuestions(qRes.data);
+            setSessions(sRes.data);
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -80,6 +85,28 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleEndSession = async (id) => {
+        if (!window.confirm("End this session? Students will be disconnected.")) return;
+        try {
+            await api.put(`/admin/sessions/${id}/end`);
+            setSessions(sessions.map(s => s.id === id ? { ...s, status: 'closed' } : s));
+            setToast({ message: "Session ended", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to end session", type: 'error' });
+        }
+    };
+
+    const handleDeleteSession = async (id) => {
+        if (!window.confirm("Delete this session entirely? This cannot be undone.")) return;
+        try {
+            await api.delete(`/admin/sessions/${id}`);
+            setSessions(sessions.filter(s => s.id !== id));
+            setToast({ message: "Session deleted", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to delete session", type: 'error' });
+        }
+    };
+
     const startSession = async () => {
         try {
             // The endpoint returns a primitive string for the code when doing rapid creation, 
@@ -106,20 +133,31 @@ const AdminDashboard = () => {
                         <label className="text-sm font-medium text-gray-700">AI Model:</label>
                         <button
                             onClick={() => { setShowModelModal(true); fetchModels(); }}
-                            className="text-sm border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 px-3 py-2 bg-white flex items-center gap-2 w-[220px]"
+                            disabled={!!sessions.find(s => s.status === 'active')}
+                            className={`text-sm border border-gray-300 rounded-lg shadow-sm px-3 py-2 flex items-center gap-2 w-[220px] ${sessions.find(s => s.status === 'active') ? 'bg-gray-100 opacity-60 cursor-not-allowed' : 'bg-white hover:bg-gray-50'}`}
                             title={selectedModel}
                         >
                             <Bot className="w-4 h-4 text-gray-500 shrink-0" />
                             <span className="truncate flex-1 text-left">{selectedModel}</span>
                         </button>
                     </div>
-                    <button
-                        onClick={startSession}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-medium"
-                    >
-                        <PlayCircle className="w-5 h-5" />
-                        Start New Session
-                    </button>
+                    {sessions.find(s => s.status === 'active') ? (
+                        <button
+                            onClick={() => navigate(`/admin/session/${sessions.find(s => s.status === 'active').code}`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-sm font-medium"
+                        >
+                            <PlayCircle className="w-5 h-5" />
+                            Open Active Session
+                        </button>
+                    ) : (
+                        <button
+                            onClick={startSession}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-medium"
+                        >
+                            <PlayCircle className="w-5 h-5" />
+                            Start New Session
+                        </button>
+                    )}
                     <button onClick={() => { logout(); navigate('/admin/login') }} className="p-2 text-gray-500 hover:text-gray-900 transition ml-2">
                         <LogOut className="w-5 h-5" />
                     </button>
@@ -198,6 +236,66 @@ const AdminDashboard = () => {
                                     </li>
                                 ))}
                             </ul>
+                        )}
+                    </div>
+                )}
+
+                <div className="mt-12 mb-6 border-t border-gray-200 pt-10">
+                    <h2 className="text-2xl font-semibold text-gray-900">Session History</h2>
+                </div>
+
+                {loading ? (
+                    <div className="text-center py-12 text-gray-500">Loading sessions...</div>
+                ) : (
+                    <div className="bg-white border text-left border-gray-200 rounded-xl overflow-hidden shadow-sm mb-12">
+                        {sessions.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">No sessions recorded yet. Start one above!</div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-200">
+                                        <th className="p-4 font-semibold text-gray-600 text-sm">Code</th>
+                                        <th className="p-4 font-semibold text-gray-600 text-sm">Model</th>
+                                        <th className="p-4 font-semibold text-gray-600 text-sm">Status</th>
+                                        <th className="p-4 font-semibold text-gray-600 text-sm text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {sessions.map(s => (
+                                        <tr key={s.id} className="hover:bg-gray-50 transition group">
+                                            <td className="p-4 font-mono font-bold text-gray-900">{s.code}</td>
+                                            <td className="p-4 flex items-center gap-2 text-sm text-gray-600"><Bot className="w-4 h-4" /> {s.ai_model}</td>
+                                            <td className="p-4">
+                                                {s.status === 'active' ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                        Active
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                                        Closed
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    {s.status === 'active' ? (
+                                                        <>
+                                                            <button onClick={() => handleEndSession(s.id)} className="px-3 py-1.5 bg-red-50 text-red-600 text-sm font-medium rounded hover:bg-red-100 transition">End Session</button>
+                                                            <button onClick={() => navigate(`/admin/session/${s.code}`)} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded hover:bg-blue-100 transition">Open</button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => handleDeleteSession(s.id)} className="px-3 py-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 text-sm font-medium rounded transition opacity-0 group-hover:opacity-100" title="Delete Session"><Trash2 className="w-4 h-4" /></button>
+                                                            <button onClick={() => navigate(`/admin/session/${s.code}`)} className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded hover:bg-gray-200 transition border border-gray-200">View Results</button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         )}
                     </div>
                 )}
