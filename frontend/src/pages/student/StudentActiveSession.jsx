@@ -66,34 +66,59 @@ const StudentActiveSession = () => {
     useEffect(() => {
         if (!hasJoined || !sessionInfo.id) return;
 
-        const wsUrl = import.meta.env.VITE_API_URL
-            ? import.meta.env.VITE_API_URL.replace('http', 'ws')
-            : 'ws://localhost:8000';
+        let ws = null;
+        let reconnectTimeout = null;
+        let isIntentionallyClosed = false;
 
-        const ws = new WebSocket(`${wsUrl}/api/student/ws/${sessionInfo.id}`);
+        const connect = () => {
+            if (isIntentionallyClosed) return;
 
-        ws.onopen = () => {
-            ws.send(JSON.stringify({ type: 'join', name: studentName }));
-        };
+            const wsUrl = import.meta.env.VITE_API_URL
+                ? import.meta.env.VITE_API_URL.replace('http', 'ws')
+                : 'ws://localhost:8000';
 
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'active_questions') {
-                    setActiveQuestions(data.questions);
-                } else if (data.type === 'session_ended') {
-                    sessionStorage.removeItem('activeSessionId');
-                    navigate('/', { state: { message: "The instructor has closed this session." } });
+            ws = new WebSocket(`${wsUrl}/api/student/ws/${sessionInfo.id}`);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ type: 'join', name: studentName }));
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'active_questions') {
+                        setActiveQuestions(data.questions);
+                    } else if (data.type === 'session_ended') {
+                        isIntentionallyClosed = true;
+                        sessionStorage.removeItem('activeSessionId');
+                        navigate('/', { state: { message: "The instructor has closed this session." } });
+                    }
+                } catch (e) {
+                    console.error("Failed to parse websocket message", e);
                 }
-            } catch (e) {
-                console.error("Failed to parse websocket message", e);
-            }
+            };
+
+            ws.onclose = () => {
+                if (!isIntentionallyClosed) {
+                    reconnectTimeout = setTimeout(connect, 3000);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket encountered an error:", error);
+            };
         };
+
+        connect();
 
         return () => {
-            ws.close();
+            isIntentionallyClosed = true;
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
         };
-    }, [hasJoined, sessionInfo.id, studentName]);
+    }, [hasJoined, sessionInfo.id, studentName, navigate]);
 
     const handleResponseChange = (qId, text) => {
         setResponses(prev => ({ ...prev, [qId]: text }));

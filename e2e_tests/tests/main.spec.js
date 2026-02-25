@@ -45,7 +45,7 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
         await expect(startSessionBtn).toBeVisible();
 
         // 3. Admin starts a session with the isolated test model
-        await adminPage.click('button[title="meta-llama/llama-3-8b-instruct:free"]');
+        await adminPage.click('button[title="meta-llama/llama-3.3-70b-instruct:free"]');
         await expect(adminPage.locator('text="Select AI Model"')).toBeVisible();
         await adminPage.locator('.fixed').locator('text="test-model"').click();
         await adminPage.click('button:has-text("Start New Session")');

@@ -18,7 +18,7 @@ const AdminDashboard = () => {
     const [showQForm, setShowQForm] = useState(false);
 
     // AI Model Selector
-    const [selectedModel, setSelectedModel] = useState('meta-llama/llama-3-8b-instruct:free');
+    const [selectedModel, setSelectedModel] = useState('meta-llama/llama-3.3-70b-instruct:free');
     const [showModelModal, setShowModelModal] = useState(false);
     const [openRouterModels, setOpenRouterModels] = useState([]);
     const [modelsLoading, setModelsLoading] = useState(false);

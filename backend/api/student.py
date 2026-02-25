@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 from typing import List, Dict, Any
 from db.session_repo import SessionRepository
 from db.question_repo import QuestionRepository
@@ -38,9 +39,10 @@ class ConnectionManager:
     async def broadcast(self, session_id: int, message: dict):
         if session_id in self.active_sessions:
             connections = list(self.active_sessions[session_id].keys())
+            encoded_message = jsonable_encoder(message)
             for connection in connections:
                 try:
-                    await connection.send_json(message)
+                    await connection.send_json(encoded_message)
                 except Exception:
                     pass
 
@@ -52,13 +54,18 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
     try:
         # Send current active questions immediately upon connecting
         questions = await SessionRepository.get_active_questions(session_id)
-        await websocket.send_json({"type": "active_questions", "questions": questions})
+        
+        # Serialize datetime objects securely for raw websocket ingestion
+        encoded_questions = jsonable_encoder(questions)
+        await websocket.send_json({"type": "active_questions", "questions": encoded_questions})
         
         while True:
             data = await websocket.receive_json()
             if data.get("type") == "join" and data.get("name"):
                 manager.update_name(websocket, session_id, str(data.get("name")).strip())
     except WebSocketDisconnect:
+        manager.disconnect(websocket, session_id)
+    except Exception as e:
         manager.disconnect(websocket, session_id)
 
 @router.post("/join/{code}")
