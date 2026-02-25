@@ -18,13 +18,25 @@ A dockerized web application for collecting and AI-grading student responses in 
    OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
    ```
 
-3. **Configure Your Domain (SSL/HTTPS)**:
-   - Open `Caddyfile` and replace `YOUR_DOMAIN` with your actual domain, e.g., `feedback.myname.com`.
-   - In your DNS registrar, create an **A Record** pointing that domain to your server's public IP.
-   - Ensure TCP ports **80** and **443** are open in your server firewall/security group.
-   - Caddy will automatically provision and renew a free Let's Encrypt SSL certificate.
+3. **Set Up DNS**:
+   Log into your domain registrar (Namecheap, GoDaddy, etc.) and create an **A Record**:
+   | Type | Host | Value |
+   |------|------|-------|
+   | A | `feedback` (or any subdomain) | Your server's public IP |
 
-4. **Run the Application**:
+4. **Configure Caddyfile**:
+   Open `Caddyfile` and replace `YOUR_DOMAIN` with your actual domain:
+   ```
+   feedback.myname.com {
+   ```
+
+5. **Open Firewall Ports** (ports 5173/8000 can be closed):
+   ```bash
+   sudo ufw allow 80 && sudo ufw allow 443
+   ```
+   Also allow these in your cloud provider's firewall/security group if applicable. Caddy auto-provisions and renews Let's Encrypt SSL certificates.
+
+6. **Run the Application**:
    ```bash
    docker compose up -d --build
    ```
