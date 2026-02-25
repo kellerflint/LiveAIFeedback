@@ -5,6 +5,7 @@ import { PlusCircle, PlayCircle, LogOut, Trash2, Search, X, Bot } from 'lucide-r
 import { AuthContext } from '../../context/AuthContext';
 import Toast from '../../components/Toast';
 import ModelSearchModal from '../../components/admin/ModelSearchModal';
+import QuestionModal from '../../components/admin/QuestionModal';
 
 const AdminDashboard = () => {
     const [questions, setQuestions] = useState([]);
@@ -13,9 +14,9 @@ const AdminDashboard = () => {
     const { logout } = React.useContext(AuthContext);
     const navigate = useNavigate();
 
-    // New Question Form State
-    const [newQuestion, setNewQuestion] = useState({ text: '', grading_criteria: '' });
-    const [showQForm, setShowQForm] = useState(false);
+    // Universal Question Modal State
+    const [showQuestionModal, setShowQuestionModal] = useState(false);
+    const [editingQuestion, setEditingQuestion] = useState(null);
 
     // AI Model Selector
     const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem('preferredAiModel') || '');
@@ -61,16 +62,21 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleCreateQuestion = async (e) => {
-        e.preventDefault();
+    const handleSaveQuestion = async (questionData) => {
         try {
-            const res = await api.post('/admin/questions', newQuestion);
-            setQuestions([res.data, ...questions]);
-            setNewQuestion({ text: '', grading_criteria: '' });
-            setShowQForm(false);
-            setToast({ message: "Question created successfully", type: 'success' });
+            if (editingQuestion) {
+                const res = await api.put(`/admin/questions/${editingQuestion.id}`, questionData);
+                setQuestions(questions.map(q => q.id === editingQuestion.id ? res.data : q));
+                setToast({ message: "Question updated successfully", type: 'success' });
+            } else {
+                const res = await api.post('/admin/questions', questionData);
+                setQuestions([res.data, ...questions]);
+                setToast({ message: "Question created successfully", type: 'success' });
+            }
+            setShowQuestionModal(false);
+            setEditingQuestion(null);
         } catch (error) {
-            setToast({ message: "Failed to create question", type: 'error' });
+            setToast({ message: editingQuestion ? "Failed to update question" : "Failed to create question", type: 'error' });
         }
     };
 
@@ -189,46 +195,12 @@ const AdminDashboard = () => {
                 <div className="flex justify-between items-end mb-6">
                     <h2 className="text-2xl font-semibold text-gray-900">Question Bank</h2>
                     <button
-                        onClick={() => setShowQForm(!showQForm)}
+                        onClick={() => { setEditingQuestion(null); setShowQuestionModal(true); }}
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
                     >
                         <PlusCircle className="w-5 h-5" /> New Question
                     </button>
                 </div>
-
-                {showQForm && (
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8 animate-in fade-in slide-in-from-top-4">
-                        <h3 className="text-lg font-medium mb-4">Create New Question</h3>
-                        <form onSubmit={handleCreateQuestion} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Question Text</label>
-                                <textarea
-                                    required
-                                    rows={2}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    value={newQuestion.text}
-                                    onChange={e => setNewQuestion({ ...newQuestion, text: e.target.value })}
-                                    placeholder="e.g. What is the powerhouse of the cell?"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Grading Criteria (for AI)</label>
-                                <textarea
-                                    required
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    value={newQuestion.grading_criteria}
-                                    onChange={e => setNewQuestion({ ...newQuestion, grading_criteria: e.target.value })}
-                                    placeholder="e.g. 4 pts for 'Mitochondria'. 1 pt for any other organelle."
-                                />
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setShowQForm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800">Save Question</button>
-                            </div>
-                        </form>
-                    </div>
-                )}
 
                 {loading ? (
                     <div className="text-center py-12 text-gray-500">Loading library...</div>
@@ -241,14 +213,23 @@ const AdminDashboard = () => {
                                 {questions.map(q => (
                                     <li key={q.id} className="p-6 hover:bg-gray-50 transition relative group">
                                         <div className="flex justify-between items-start mb-2">
-                                            <p className="font-medium text-gray-900 text-lg pr-8">{q.text}</p>
-                                            <button
-                                                onClick={() => handleDeleteQuestion(q.id)}
-                                                className="absolute right-6 top-6 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-50"
-                                                title="Delete Question"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
+                                            <p className="font-medium text-gray-900 text-lg pr-16">{q.text}</p>
+                                            <div className="absolute right-6 top-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
+                                                <button
+                                                    onClick={() => { setEditingQuestion(q); setShowQuestionModal(true); }}
+                                                    className="text-gray-400 hover:text-blue-600 transition p-1 rounded-md hover:bg-blue-50"
+                                                    title="Edit Question"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteQuestion(q.id)}
+                                                    className="text-gray-400 hover:text-red-500 transition p-1 rounded-md hover:bg-red-50"
+                                                    title="Delete Question"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="bg-gray-100 p-3 rounded-md border border-gray-200 text-sm font-mono text-gray-700 whitespace-pre-wrap">
                                             <span className="font-semibold text-gray-500 uppercase text-xs tracking-wider block mb-1">AI Criteria</span>
@@ -335,6 +316,14 @@ const AdminDashboard = () => {
                 setModelSearch={setModelSearch}
                 selectedModel={selectedModel}
                 setSelectedModel={handleModelSelect}
+            />
+
+            {/* Universal Question Modal */}
+            <QuestionModal
+                show={showQuestionModal}
+                onClose={() => { setShowQuestionModal(false); setEditingQuestion(null); }}
+                onSave={handleSaveQuestion}
+                editingQuestion={editingQuestion}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

@@ -32,6 +32,17 @@ class QuestionRepository:
                 return cur.lastrowid
 
     @staticmethod
+    async def update(question_id: int, q: QuestionCreate) -> bool:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE question SET text = %s, grading_criteria = %s WHERE id = %s",
+                    (q.text, q.grading_criteria, question_id)
+                )
+                return cur.rowcount > 0
+
+    @staticmethod
     async def delete(question_id: int) -> bool:
         pool = await get_db_pool()
         async with pool.acquire() as conn:

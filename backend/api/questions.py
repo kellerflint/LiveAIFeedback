@@ -17,6 +17,15 @@ async def create_question(question: QuestionCreate, current_user: dict = Depends
     q_id = await QuestionRepository.create(question)
     return {**question.model_dump(), "id": q_id, "created_at": datetime.now(timezone.utc)}
 
+@router.put("/questions/{question_id}", response_model=Question)
+async def update_question(question_id: int, question: QuestionCreate, current_user: dict = Depends(get_current_admin)):
+    success = await QuestionRepository.update(question_id, question)
+    if not success:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    db_question = await QuestionRepository.get_by_id(question_id)
+    return db_question
+
 @router.delete("/questions/{question_id}")
 async def delete_question(question_id: int, current_user: dict = Depends(get_current_admin)):
     success = await QuestionRepository.delete(question_id)

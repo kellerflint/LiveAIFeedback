@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # Ephemeral Test Database
+  db-e2e:
+    image: mysql:8.0
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: my-secret-pw
+      MYSQL_DATABASE: fb_tool
+    ports:
+      - "3307:3306" # Maps to 3307 on host to avoid conflict with live 3306
+    volumes:
+      # No persistent volume mount. Pure ephemeral isolation.
+      - ./database:/docker-entrypoint-initdb.d
+
+  backend-e2e:
+    build: ./backend
+    restart: "on-failure"
+    ports:
+      - "8001:8000" # Map to 8001 on host to avoid conflict with live 8000
+    environment:
+      - DATABASE_URL=mysql+aiomysql://root:my-secret-pw@db-e2e/fb_tool
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db-e2e
+    volumes:
+      - ./backend:/app
+
+  frontend-e2e:
+    build: ./frontend
+    restart: "no"
+    command: npm run dev -- --host
+    ports:
+      - "5174:5173" # Map to 5174 on host
+    environment:
+      - VITE_API_URL=http://host.docker.internal:8001
+    depends_on:
+      - backend-e2e
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules

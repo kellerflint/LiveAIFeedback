@@ -89,8 +89,8 @@ async def get_active_questions(session_id: int):
     questions = await SessionRepository.get_active_questions(session_id)
     return questions
 
-@router.post("/session/{session_id}/question/{question_id}/submit")
-async def submit_response(session_id: int, question_id: int, response: StudentResponseCreate):
+@router.post("/session/{session_id}/question/{question_id}/instance/{session_question_id}/submit")
+async def submit_response(session_id: int, question_id: int, session_question_id: int, response: StudentResponseCreate):
     # Retrieve the question and session details
     question = await QuestionRepository.get_by_id(question_id)
     session = await SessionRepository.get_by_id(session_id)
@@ -113,10 +113,26 @@ async def submit_response(session_id: int, question_id: int, response: StudentRe
     response_id = await StudentRepository.save_response(
         session_id=session_id,
         question_id=question_id,
+        session_question_id=session_question_id,
         student_name=response.student_name,
         response_text=response.response_text,
         ai_score=score,
         ai_feedback=feedback
     )
+
+    # Broadcast explicitly via Websockets so Admin dashboard updates in real-time
+    await manager.broadcast(session_id, {
+        "type": "new_response",
+        "question_id": question_id,
+        "session_question_id": session_question_id,
+        "response": {
+            "id": response_id,
+            "student_name": response.student_name,
+            "response_text": response.response_text,
+            "ai_score": score,
+            "ai_feedback": feedback,
+            "created_at": "Just now"
+        }
+    })
             
     return {"message": "Response submitted successfully", "response_id": response_id, "score": score, "feedback": feedback}

@@ -36,10 +36,14 @@ test.describe('Complex WebSocket Tracking & Broadcasting', () => {
 
         // Create a new complex test question
         await adminPage.click('text=New Question');
+
+        // Wait for modal to render
+        await expect(adminPage.getByText('Create New Question')).toBeVisible();
+
         const questionText = `Complex E2E Socket Flow Verification ${Date.now()}`;
         await adminPage.fill('textarea[placeholder*="What is the powerhouse"]', questionText);
         await adminPage.fill('textarea[placeholder*="Mitochondria"]', 'Complex logic requires complex tests.');
-        await adminPage.click('button:has-text("Save Question")');
+        await adminPage.click('button:has-text("Create Question")');
         await expect(adminPage.locator(`text=${questionText}`)).toBeVisible();
 
         // Start session triggering auto-model prompt

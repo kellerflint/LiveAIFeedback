@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api';
-import { Play, Square, Users, Copy, ArrowLeft, X, Power } from 'lucide-react';
+import { Play, Square, Users, Copy, ArrowLeft, X, Power, PlusCircle, AlertCircle } from 'lucide-react';
 import Toast from '../../components/Toast';
 import ConnectedUsersModal from '../../components/admin/ConnectedUsersModal';
+import QuestionModal from '../../components/admin/QuestionModal';
 
 const SessionLive = () => {
     const { id: sessionCode } = useParams();
@@ -16,6 +17,7 @@ const SessionLive = () => {
     const [connectedUsers, setConnectedUsers] = useState(0);
     const [connectedNames, setConnectedNames] = useState([]);
     const [showUsersModal, setShowUsersModal] = useState(false);
+    const [showNewQuestionModal, setShowNewQuestionModal] = useState(false);
 
     useEffect(() => {
         fetchInitialData();
@@ -102,6 +104,17 @@ const SessionLive = () => {
         }
     };
 
+    const handleCreateQuestion = async (questionData) => {
+        try {
+            const res = await api.post('/admin/questions', questionData);
+            setQuestions([res.data, ...questions]);
+            setShowNewQuestionModal(false);
+            setToast({ message: "Question added to bank", type: 'success' });
+        } catch (error) {
+            setToast({ message: "Failed to create question", type: 'error' });
+        }
+    };
+
     const handleEndSession = async () => {
         if (!window.confirm("Are you sure you want to end this session? Students will be disconnected.")) return;
         try {
@@ -169,8 +182,15 @@ const SessionLive = () => {
                 {/* Left Sidebar: Library */}
                 {session?.status === 'active' && (
                     <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-full overflow-hidden">
-                        <div className="p-4 border-b border-gray-200 bg-gray-50">
+                        <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center z-10">
                             <h2 className="font-semibold text-gray-900">Question Library</h2>
+                            <button
+                                onClick={() => setShowNewQuestionModal(true)}
+                                className="text-blue-600 hover:text-blue-700 transition"
+                                title="Create New Question"
+                            >
+                                <PlusCircle className="w-5 h-5" />
+                            </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {questions.map(q => (
@@ -301,12 +321,18 @@ const SessionLive = () => {
                 </div>
             </div>
 
-            {/* Connected Users Modal */}
             <ConnectedUsersModal
                 show={showUsersModal}
                 onClose={() => setShowUsersModal(false)}
                 connectedUsers={connectedUsers}
                 connectedNames={connectedNames}
+            />
+
+            {/* Universal Question Modal */}
+            <QuestionModal
+                show={showNewQuestionModal}
+                onClose={() => setShowNewQuestionModal(false)}
+                onSave={handleCreateQuestion}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

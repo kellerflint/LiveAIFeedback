@@ -73,6 +73,7 @@ class StudentResponse(BaseModel):
     id: int
     session_id: int
     question_id: int
+    session_question_id: int
     student_name: str
     response_text: str
     ai_score: Optional[int]

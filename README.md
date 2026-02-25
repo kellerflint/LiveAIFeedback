@@ -2,51 +2,45 @@
 
 A dockerized web application for collecting and AI-grading student responses in real time. Features an admin interface for live sessions/questions management and a lightweight student interface for submitting answers.
 
-## Prerequisites
+## Setup & Deployment
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+1. **Clone & Install Docker**:
+   ```bash
+   git clone <repository-url> && cd ai_rt_fb
+   # On Ubuntu VM without Docker: 
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER && newgrp docker
+   ```
 
-## Environment Setup
+2. **Configure AI API Key**:
+   Create `backend/.env` with your OpenRouter key (returns mocked AI scores if missing/invalid):
+   ```env
+   OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
+   ```
 
-1. In the `backend` directory, create a `.env` file (or copy it if there is a template). At minimum, you need to configure your OpenRouter API key to enable the AI grading features.
-
-    Create `backend/.env` with the following contents:
-    ```env
-    OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
-    ```
-    
-    *Note: If `OPENROUTER_API_KEY` is completely missing or invalid, the backend will still function but will return mocked AI grading scores for student submissions.*
-
-## Running the Application
-
-1. Open a terminal in the root directory of this project (`/Users/kellerflint/Projects/ai_rt_fb`).
-2. Build and start the containers using Docker Compose:
-    ```bash
-    docker-compose up -d --build
-    ```
-3. Wait a few seconds for the MySQL database to initialize and the backend server to start. 
+3. **Run the Application**:
+   ```bash
+   docker compose up -d --build
+   ```
 
 ## URLs & Access
 
-### Student Access
-- **URL**: [http://localhost:5173/](http://localhost:5173/)
-- Students simply need the **Session Code** provided by the admin to join an active session.
+Ensure TCP ports `5173` and `8000` are open if deploying to a VM firewall.
 
-### Admin Access
-- **URL**: [http://localhost:5173/admin/login](http://localhost:5173/admin/login)
-- **Default Credentials**:
-  - **Username**: `admin`
-  - **Password**: `admin`
+- **Student Login**: `http://localhost:5173/` or `http://<vm-ip>:5173/`
+- **Admin Dashboard**: `http://localhost:5173/admin/login`
+  - **Username**: `admin` | **Password**: `admin`
+- **Backend API Docs**: `http://localhost:8000/docs`
 
-*Note: The default admin account is seeded automatically via `database/init.sql` on the first launch.*
+## E2E Testing
 
-## Troubleshooting
+We use Playwright with a fully isolated ephemeral Docker stack to prevent test data from polluting your live database.
 
-- **Backend Logs**: If something isn't working, check the backend logs: `docker-compose logs backend -f`
-- **Database Logs**: `docker-compose logs db -f`
-- **Rebuilding after changes**: `docker-compose up -d --build`
-- **Clearing Database**: If you need to wipe the database and start fresh (this will delete all sessions and questions):
-  ```bash
-  docker-compose down -v
-  docker-compose up -d --build
-  ```
+```bash
+# First time setup
+cd e2e_tests && npm install && npx playwright install chromium
+cd ..
+
+# Run the test suite
+./e2e_tests/run_e2e.sh
+``

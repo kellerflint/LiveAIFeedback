@@ -35,13 +35,15 @@ CREATE TABLE IF NOT EXISTS student_response (
   id INT AUTO_INCREMENT PRIMARY KEY,
   session_id INT NOT NULL,
   question_id INT NOT NULL,
+  session_question_id INT NOT NULL,
   student_name VARCHAR(255) NOT NULL,
   response_text TEXT NOT NULL,
   ai_score INT,
   ai_feedback TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (session_id) REFERENCES session(id) ON DELETE CASCADE,
-  FOREIGN KEY (question_id) REFERENCES question(id) ON DELETE CASCADE
+  FOREIGN KEY (question_id) REFERENCES question(id) ON DELETE CASCADE,
+  FOREIGN KEY (session_question_id) REFERENCES session_question(id) ON DELETE CASCADE
 );
 
 -- Basic admin seed

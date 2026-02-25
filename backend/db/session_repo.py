@@ -127,8 +127,8 @@ class SessionRepository:
                 for sq in sqs:
                     await cur.execute("""
                         SELECT * FROM student_response 
-                        WHERE session_id = %s AND question_id = %s
-                    """, (session_id, sq['question_id']))
+                        WHERE session_question_id = %s
+                    """, (sq['id'],))
                     sq['responses'] = await cur.fetchall()
                 
                 return sqs

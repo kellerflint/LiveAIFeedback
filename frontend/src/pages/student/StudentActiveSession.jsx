@@ -124,10 +124,9 @@ const StudentActiveSession = () => {
         setResponses(prev => ({ ...prev, [qId]: text }));
     };
 
-    const submitAnswer = async (qId) => {
-        if (!responses[qId]?.trim()) {
-            return;
-        }
+    const submitAnswer = async (sessionQuestion) => {
+        const qId = sessionQuestion.session_question_id; // This is the unique session_question_id
+        const genericQId = sessionQuestion.id;
 
         if (!responses[qId]?.trim()) {
             return;
@@ -136,7 +135,7 @@ const StudentActiveSession = () => {
         setSubmittedStatus(prev => ({ ...prev, [qId]: { status: 'loading' } }));
 
         try {
-            const res = await api.post(`/student/session/${sessionInfo.id}/question/${qId}/submit`, {
+            const res = await api.post(`/student/session/${sessionInfo.id}/question/${genericQId}/instance/${qId}/submit`, {
                 student_name: studentName.trim(),
                 response_text: responses[qId]
             });
@@ -246,12 +245,13 @@ const StudentActiveSession = () => {
             <main className="max-w-3xl mx-auto p-6 space-y-8 mt-6">
 
                 {activeQuestions.map(q => {
-                    const subStatus = submittedStatus[q.id];
+                    const uniqueId = q.session_question_id;
+                    const subStatus = submittedStatus[uniqueId];
                     const isDone = subStatus?.status === 'done';
                     const isLoading = subStatus?.status === 'loading';
 
                     return (
-                        <div key={q.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden list-anim">
+                        <div key={uniqueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden list-anim">
                             <div className="p-6 border-b border-gray-100">
                                 <h2 className="text-xl font-medium text-gray-900 leading-relaxed">{q.text}</h2>
                             </div>
@@ -264,7 +264,7 @@ const StudentActiveSession = () => {
                                         </div>
                                         <div className="bg-white p-4 rounded-lg border border-gray-200">
                                             <span className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1 block">Your Answer</span>
-                                            <p className="text-gray-800">{responses[q.id]}</p>
+                                            <p className="text-gray-800">{responses[uniqueId]}</p>
                                         </div>
 
                                         <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 rounded-lg border border-blue-100 shadow-inner mt-4">
@@ -289,14 +289,14 @@ const StudentActiveSession = () => {
                                             rows={5}
                                             placeholder="Type your answer here..."
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow resize-y shadow-sm text-gray-800 disabled:opacity-50 disabled:bg-gray-100"
-                                            value={responses[q.id] || ''}
-                                            onChange={e => handleResponseChange(q.id, e.target.value)}
+                                            value={responses[uniqueId] || ''}
+                                            onChange={e => handleResponseChange(uniqueId, e.target.value)}
                                         ></textarea>
 
                                         <div className="flex justify-end">
                                             <button
-                                                onClick={() => submitAnswer(q.id)}
-                                                disabled={isLoading || !(responses[q.id] || '').trim()}
+                                                onClick={() => submitAnswer(q)}
+                                                disabled={isLoading || !(responses[uniqueId] || '').trim()}
                                                 className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 {isLoading ? (

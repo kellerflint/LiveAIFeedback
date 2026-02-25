@@ -27,9 +27,13 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
         // 2. Admin creates a new question
         await adminPage.click('text=New Question');
         const questionText = `E2E Test Question ${Date.now()}`;
+
+        // Wait for modal to render
+        await expect(adminPage.getByText('Create New Question')).toBeVisible();
+
         await adminPage.fill('textarea[placeholder*="What is the powerhouse"]', questionText);
         await adminPage.fill('textarea[placeholder*="Mitochondria"]', 'Give 4 points for Mitochondria');
-        await adminPage.click('button:has-text("Save Question")');
+        await adminPage.click('button:has-text("Create Question")');
 
         // Verify question appeared
         await expect(adminPage.locator(`text=${questionText}`)).toBeVisible();
