@@ -7,8 +7,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: my-secret-pw
       MYSQL_DATABASE: fb_tool
-    ports:
-      - "3306:3306"
+    expose:
+      - "3306"
     volumes:
       - db_data:/var/lib/mysql
       - ./database:/docker-entrypoint-initdb.d
@@ -16,8 +16,8 @@ services:
   backend:
     build: ./backend
     restart: always
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - DATABASE_URL=mysql+aiomysql://root:my-secret-pw@db/fb_tool
     env_file:
@@ -30,13 +30,31 @@ services:
   frontend:
     build: ./frontend
     restart: always
-    ports:
-      - "5173:5173"
+    expose:
+      - "5173"
     depends_on:
       - backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
 
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
 volumes:
   db_data:
+  caddy_data:
+  caddy_config:
+

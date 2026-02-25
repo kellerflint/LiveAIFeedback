@@ -1,0 +1,18 @@
+# Replace YOUR_DOMAIN with your actual domain, e.g., feedback.kellerflint.com
+# Caddy will automatically provision and renew an SSL certificate for this domain.
+YOUR_DOMAIN {
+    # Route all API and WebSocket traffic to the FastAPI backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Route health check
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
+    # Route everything else to the Vite React frontend
+    handle {
+        reverse_proxy frontend:5173
+    }
+}

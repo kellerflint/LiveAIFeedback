@@ -18,19 +18,22 @@ A dockerized web application for collecting and AI-grading student responses in 
    OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
    ```
 
-3. **Run the Application**:
+3. **Configure Your Domain (SSL/HTTPS)**:
+   - Open `Caddyfile` and replace `YOUR_DOMAIN` with your actual domain, e.g., `feedback.myname.com`.
+   - In your DNS registrar, create an **A Record** pointing that domain to your server's public IP.
+   - Ensure TCP ports **80** and **443** are open in your server firewall/security group.
+   - Caddy will automatically provision and renew a free Let's Encrypt SSL certificate.
+
+4. **Run the Application**:
    ```bash
    docker compose up -d --build
    ```
 
 ## URLs & Access
 
-Ensure TCP ports `5173` and `8000` are open if deploying to a VM firewall.
-
-- **Student Login**: `http://localhost:5173/` or `http://<vm-ip>:5173/`
-- **Admin Dashboard**: `http://localhost:5173/admin/login`
+- **Student Login**: `https://your-domain.com/`
+- **Admin Dashboard**: `https://your-domain.com/admin/login`
   - **Username**: `admin` | **Password**: `admin`
-- **Backend API Docs**: `http://localhost:8000/docs`
 
 ## E2E Testing
 
@@ -43,4 +46,5 @@ cd ..
 
 # Run the test suite
 ./e2e_tests/run_e2e.sh
-``
+```
+
