@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../api';
+import api, { getBaseUrl } from '../../api';
 import { Play, Square, Users, Copy, ArrowLeft, X, Power, PlusCircle, AlertCircle } from 'lucide-react';
 import Toast from '../../components/Toast';
 import ConnectedUsersModal from '../../components/admin/ConnectedUsersModal';
@@ -27,7 +27,8 @@ const SessionLive = () => {
         if (!session) return;
 
         // Setup SSE for real-time results
-        const sse = new EventSource(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/sessions/${session.id}/live-results`);
+        const sseUrl = `${getBaseUrl()}/api/admin/sessions/${session.id}/live-results`;
+        const sse = new EventSource(sseUrl);
 
         const doPoll = async () => {
             try {

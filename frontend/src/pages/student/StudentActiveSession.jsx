@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../api';
+import api, { getWsUrl } from '../../api';
 import { Send, CheckCircle2, Clock } from 'lucide-react';
 
 const StudentActiveSession = () => {
@@ -70,12 +70,10 @@ const StudentActiveSession = () => {
         let reconnectTimeout = null;
         let isIntentionallyClosed = false;
 
+        const wsUrl = getWsUrl();
+
         const connect = () => {
             if (isIntentionallyClosed) return;
-
-            const wsUrl = import.meta.env.VITE_API_URL
-                ? import.meta.env.VITE_API_URL.replace('http', 'ws')
-                : 'ws://localhost:8000';
 
             ws = new WebSocket(`${wsUrl}/api/student/ws/${sessionInfo.id}`);
 

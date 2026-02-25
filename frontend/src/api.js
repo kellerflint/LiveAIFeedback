@@ -1,11 +1,21 @@
 import axios from 'axios';
 
-const getBaseUrl = () => {
+export const getBaseUrl = () => {
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
     if (window.location.hostname === 'host.docker.internal') {
         return 'http://host.docker.internal:8000';
     }
-    return 'http://localhost:8000';
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:8000`;
+};
+
+export const getWsUrl = () => {
+    const baseUrl = getBaseUrl();
+    if (baseUrl.startsWith('https://')) {
+        return baseUrl.replace('https://', 'wss://');
+    }
+    return baseUrl.replace('http://', 'ws://');
 };
 
 const api = axios.create({
