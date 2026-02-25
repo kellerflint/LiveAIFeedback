@@ -11,6 +11,9 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
         const adminPage = await adminContext.newPage();
         const studentPage = await studentContext.newPage();
 
+        // Auto-accept confirmation dialogs
+        adminPage.on('dialog', dialog => dialog.accept());
+
         // =============== ADMIN FLOW ===============
         // 1. Admin logs in
         await adminPage.goto('/admin/login');
@@ -31,10 +34,20 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
         // Verify question appeared
         await expect(adminPage.locator(`text=${questionText}`)).toBeVisible();
 
+        // Force a clean state: If there's an active session from a dead test run, end it.
+        const startSessionBtn = adminPage.locator('button:has-text("Start New Session")');
+        if (!(await startSessionBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+            const endBtn = adminPage.locator('button:has-text("End Session")').first();
+            if (await endBtn.isVisible()) {
+                await endBtn.click();
+            }
+        }
+        await expect(startSessionBtn).toBeVisible();
+
         // 3. Admin starts a session with the isolated test model
         await adminPage.click('button[title="meta-llama/llama-3-8b-instruct:free"]');
         await expect(adminPage.locator('text="Select AI Model"')).toBeVisible();
-        await adminPage.click('text="test-model"');
+        await adminPage.locator('.fixed').locator('text="test-model"').click();
         await adminPage.click('button:has-text("Start New Session")');
         await expect(adminPage).toHaveURL(/.*\/admin\/session\/.*/);
 
@@ -99,9 +112,6 @@ test.describe('Real-Time Teaching Feedback E2E', () => {
 
         // Find our question card
         const questionItem = adminPage.locator('li', { hasText: questionText });
-
-        // Handle the browser natively triggered window.confirm BEFORE clicking
-        adminPage.on('dialog', dialog => dialog.accept());
 
         // Click the delete trash can inside it (force it since it's opacity-0 by default)
         await questionItem.locator('button[title="Delete Question"]').click({ force: true });

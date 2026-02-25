@@ -1,11 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
-import aiomysql
 from typing import List, Dict, Any
-from db.session import get_db_pool
 from db.session_repo import SessionRepository
+from db.question_repo import QuestionRepository
+from db.student_repo import StudentRepository
 from models.schemas import StudentResponseCreate
 from core.ai_service import grade_response
-from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -36,12 +35,25 @@ class ConnectionManager:
         names = list(self.active_sessions[session_id].values())
         return [n for n in names if n != "Anonymous"]
 
+    async def broadcast(self, session_id: int, message: dict):
+        if session_id in self.active_sessions:
+            connections = list(self.active_sessions[session_id].keys())
+            for connection in connections:
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    pass
+
 manager = ConnectionManager()
 
 @router.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     await manager.connect(websocket, session_id)
     try:
+        # Send current active questions immediately upon connecting
+        questions = await SessionRepository.get_active_questions(session_id)
+        await websocket.send_json({"type": "active_questions", "questions": questions})
+        
         while True:
             data = await websocket.receive_json()
             if data.get("type") == "join" and data.get("name"):
@@ -62,13 +74,9 @@ async def join_session(code: str):
 @router.get("/session/{session_id}/active-questions")
 async def get_active_questions(session_id: int):
     # First check if session is closed to auto-kick students
-    pool = await get_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT status FROM session WHERE id = %s", (session_id,))
-            session_data = await cur.fetchone()
-            if not session_data or session_data['status'] != 'active':
-                raise HTTPException(status_code=400, detail="This session is no longer active")
+    session_data = await SessionRepository.get_by_id(session_id)
+    if not session_data or session_data['status'] != 'active':
+        raise HTTPException(status_code=400, detail="This session is no longer active")
 
     # Returns the questions currently open for this session
     questions = await SessionRepository.get_active_questions(session_id)
@@ -77,14 +85,8 @@ async def get_active_questions(session_id: int):
 @router.post("/session/{session_id}/question/{question_id}/submit")
 async def submit_response(session_id: int, question_id: int, response: StudentResponseCreate):
     # Retrieve the question and session details
-    pool = await get_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM question WHERE id = %s", (question_id,))
-            question = await cur.fetchone()
-            
-            await cur.execute("SELECT * FROM session WHERE id = %s", (session_id,))
-            session = await cur.fetchone()
+    question = await QuestionRepository.get_by_id(question_id)
+    session = await SessionRepository.get_by_id(session_id)
 
     if not question or not session:
         raise HTTPException(status_code=404, detail="Question or session not found")
@@ -101,14 +103,13 @@ async def submit_response(session_id: int, question_id: int, response: StudentRe
     )
 
     # Save the response
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """INSERT INTO student_response 
-                   (session_id, question_id, student_name, response_text, ai_score, ai_feedback) 
-                   VALUES (%s, %s, %s, %s, %s, %s)""",
-                (session_id, question_id, response.student_name, response.response_text, score, feedback)
-            )
-            response_id = cur.lastrowid
+    response_id = await StudentRepository.save_response(
+        session_id=session_id,
+        question_id=question_id,
+        student_name=response.student_name,
+        response_text=response.response_text,
+        ai_score=score,
+        ai_feedback=feedback
+    )
             
     return {"message": "Response submitted successfully", "response_id": response_id, "score": score, "feedback": feedback}

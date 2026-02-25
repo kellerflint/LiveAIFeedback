@@ -1,5 +1,6 @@
 # Logs
 *.log
+backend/test_results/
 
 # Node / Frontend
 node_modules/

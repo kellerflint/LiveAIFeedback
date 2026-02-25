@@ -13,6 +13,9 @@ test.describe('Connection Tracking via WebSockets', () => {
         const student1Page = await student1Context.newPage();
         const student2Page = await student2Context.newPage();
 
+        // Auto-accept confirmation dialogs
+        adminPage.on('dialog', dialog => dialog.accept());
+
         // =============== 1. ADMIN CREATES SESSION ===============
         await adminPage.goto('/admin/login');
         await adminPage.fill('input[type="text"]', 'admin');
@@ -20,10 +23,20 @@ test.describe('Connection Tracking via WebSockets', () => {
         await adminPage.click('button[type="submit"]');
         await expect(adminPage).toHaveURL(/.*\/admin\/dashboard/);
 
+        // Force a clean state: If there's an active session from a dead test run, end it.
+        const startSessionBtn = adminPage.locator('button:has-text("Start New Session")');
+        if (!(await startSessionBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+            const endBtn = adminPage.locator('button:has-text("End Session")').first();
+            if (await endBtn.isVisible()) {
+                await endBtn.click();
+            }
+        }
+        await expect(startSessionBtn).toBeVisible();
+
         // Start session with isolated model
         await adminPage.click('button[title="meta-llama/llama-3-8b-instruct:free"]');
         await expect(adminPage.locator('text="Select AI Model"')).toBeVisible();
-        await adminPage.click('text="test-model"');
+        await adminPage.locator('.fixed').locator('text="test-model"').click();
         await adminPage.click('button:has-text("Start New Session")');
         await expect(adminPage).toHaveURL(/.*\/admin\/session\/.*/);
 
