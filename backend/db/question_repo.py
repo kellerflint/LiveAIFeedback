@@ -13,6 +13,14 @@ class QuestionRepository:
                 return await cur.fetchall()
 
     @staticmethod
+    async def get_by_id(question_id: int) -> dict:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM question WHERE id = %s", (question_id,))
+                return await cur.fetchone()
+
+    @staticmethod
     async def create(q: QuestionCreate) -> int:
         pool = await get_db_pool()
         async with pool.acquire() as conn:

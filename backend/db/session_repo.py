@@ -48,12 +48,26 @@ class SessionRepository:
                 return await cur.fetchone()
 
     @staticmethod
+    async def get_by_id(session_id: int) -> dict:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM session WHERE id = %s", (session_id,))
+                return await cur.fetchone()
+
+    @staticmethod
     async def close_session(session_id: int):
         pool = await get_db_pool()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("UPDATE session SET status = 'closed' WHERE id = %s", (session_id,))
-                await cur.execute("UPDATE session_question SET status = 'closed' WHERE session_id = %s", (session_id,))
+            await conn.begin()
+            try:
+                async with conn.cursor() as cur:
+                    await cur.execute("UPDATE session SET status = 'closed' WHERE id = %s", (session_id,))
+                    await cur.execute("UPDATE session_question SET status = 'closed' WHERE session_id = %s", (session_id,))
+                await conn.commit()
+            except Exception as e:
+                await conn.rollback()
+                raise e
 
     @staticmethod
     async def delete_session(session_id: int):

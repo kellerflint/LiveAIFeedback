@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 import asyncio
+import httpx
+import logging
 from typing import List
 from api.admin_auth import get_current_admin
 from db.session_repo import SessionRepository
 from models.schemas import Session, SessionCreate, SessionQuestion
 from api.student import manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -21,6 +25,18 @@ async def create_session(session: SessionCreate, current_user: dict = Depends(ge
 async def get_all_sessions(current_user: dict = Depends(get_current_admin)):
     return await SessionRepository.get_all()
 
+@router.get("/models")
+async def get_models(current_user: dict = Depends(get_current_admin)):
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("https://openrouter.ai/api/v1/models", timeout=10.0)
+            resp.raise_for_status()
+            # Cache could be implemented here if needed.
+            return resp.json().get("data", [])
+    except Exception as e:
+        logger.error(f"Failed to fetch models from OpenRouter proxy: {e}")
+        return []
+
 @router.get("/sessions/{code}")
 async def get_session(code: str, current_user: dict = Depends(get_current_admin)):
     session = await SessionRepository.get_by_code(code)
@@ -31,7 +47,7 @@ async def get_session(code: str, current_user: dict = Depends(get_current_admin)
 @router.put("/sessions/{session_id}/end")
 async def end_session(session_id: int, current_user: dict = Depends(get_current_admin)):
     await SessionRepository.close_session(session_id)
-    # Also disconnect websockets from the manager if needed, but the auto-kick logic on the frontend will handle it via polling.
+    await manager.broadcast(session_id, {"type": "session_ended"})
     return {"status": "closed"}
 
 @router.delete("/sessions/{session_id}")
@@ -43,11 +59,15 @@ async def delete_session(session_id: int, current_user: dict = Depends(get_curre
 async def activate_question(session_id: int, question_id: int, current_user: dict = Depends(get_current_admin)):
     # Launch a single question
     sq_id = await SessionRepository.launch_question(session_id, question_id)
+    questions = await SessionRepository.get_active_questions(session_id)
+    await manager.broadcast(session_id, {"type": "active_questions", "questions": questions})
     return {"session_question_id": sq_id, "status": "open"}
 
 @router.put("/sessions/{session_id}/question/{session_question_id}/close")
 async def close_question(session_id: int, session_question_id: int, current_user: dict = Depends(get_current_admin)):
     await SessionRepository.close_question(session_question_id)
+    questions = await SessionRepository.get_active_questions(session_id)
+    await manager.broadcast(session_id, {"type": "active_questions", "questions": questions})
     return {"status": "closed"}
 
 @router.get("/sessions/{session_id}/results")

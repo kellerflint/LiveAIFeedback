@@ -46,17 +46,8 @@ const StudentActiveSession = () => {
 
         initializeSession();
 
-        // Polling for new questions every 3 seconds
-        const interval = setInterval(() => {
-            const sId = sessionInfo.id || sessionStorage.getItem('activeSessionId');
-            if (sId) {
-                fetchActiveQuestions(parseInt(sId, 10));
-            }
-        }, 3000);
-
         return () => {
             isMounted = false;
-            clearInterval(interval);
         };
     }, [code, navigate, sessionInfo.id]);
 
@@ -83,6 +74,20 @@ const StudentActiveSession = () => {
 
         ws.onopen = () => {
             ws.send(JSON.stringify({ type: 'join', name: studentName }));
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'active_questions') {
+                    setActiveQuestions(data.questions);
+                } else if (data.type === 'session_ended') {
+                    sessionStorage.removeItem('activeSessionId');
+                    navigate('/', { state: { message: "The instructor has closed this session." } });
+                }
+            } catch (e) {
+                console.error("Failed to parse websocket message", e);
+            }
         };
 
         return () => {
