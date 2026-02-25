@@ -13,4 +13,5 @@ class StudentRepository:
                        VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                     (session_id, question_id, session_question_id, student_name, response_text, ai_score, ai_feedback)
                 )
+                await conn.commit()
                 return cur.lastrowid
