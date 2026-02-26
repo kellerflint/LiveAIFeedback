@@ -253,7 +253,7 @@ const StudentActiveSession = () => {
                     return (
                         <div key={uniqueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden list-anim">
                             <div className="p-6 border-b border-gray-100">
-                                <h2 className="text-xl font-medium text-gray-900 leading-relaxed">{q.text}</h2>
+                                <h2 className="text-xl font-medium text-gray-900 leading-relaxed whitespace-pre-wrap">{q.text}</h2>
                             </div>
 
                             <div className="p-6 bg-gray-50">
@@ -264,7 +264,7 @@ const StudentActiveSession = () => {
                                         </div>
                                         <div className="bg-white p-4 rounded-lg border border-gray-200">
                                             <span className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1 block">Your Answer</span>
-                                            <p className="text-gray-800">{responses[uniqueId]}</p>
+                                            <p className="text-gray-800 whitespace-pre-wrap">{responses[uniqueId]}</p>
                                         </div>
 
                                         <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 rounded-lg border border-blue-100 shadow-inner mt-4">
@@ -273,7 +273,7 @@ const StudentActiveSession = () => {
                                                     <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2 block flex items-center gap-2">
                                                         AI Teaching Assistant
                                                     </span>
-                                                    <p className="text-indigo-900 font-medium leading-relaxed" data-testid="response-feedback">{subStatus.feedback}</p>
+                                                    <p className="text-indigo-900 font-medium leading-relaxed whitespace-pre-wrap" data-testid="response-feedback">{subStatus.feedback}</p>
                                                 </div>
                                                 <div className="text-center bg-white py-2 px-4 rounded-lg shadow-sm border border-indigo-100 flex flex-col items-center justify-center">
                                                     <span className="text-sm font-bold text-gray-500 uppercase">Score</span>

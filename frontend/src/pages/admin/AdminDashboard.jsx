@@ -407,7 +407,7 @@ const AdminDashboard = () => {
                                     <li key={q.id} data-testid={`question-card-${q.id}`} className="p-6 hover:bg-gray-50 transition relative group">
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
-                                                <p className="font-medium text-gray-900 text-lg pr-16">{q.text}</p>
+                                                <p className="font-medium text-gray-900 text-lg pr-16 whitespace-pre-wrap">{q.text}</p>
                                                 {q.collection_name && (
                                                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full mt-1 inline-block">
                                                         {q.collection_name}

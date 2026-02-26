@@ -304,7 +304,7 @@ const SessionLive = () => {
                             ) : (
                                 sidebarQuestions.map(q => (
                                     <div key={q.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-300 transition shadow-sm">
-                                        <p className="text-gray-900 font-medium mb-1">{q.text}</p>
+                                        <p className="text-gray-900 font-medium mb-1 whitespace-pre-wrap">{q.text}</p>
                                         {q.collection_name && (
                                             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full inline-block mb-3">
                                                 {q.collection_name}
@@ -366,7 +366,7 @@ const SessionLive = () => {
                                         <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium uppercase tracking-wider mb-3 ${r.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                                             {r.status === 'open' ? 'Accepting Responses' : 'Closed'}
                                         </span>
-                                        <h3 className="text-xl font-medium text-gray-900">{r.text}</h3>
+                                        <h3 className="text-xl font-medium text-gray-900 whitespace-pre-wrap">{r.text}</h3>
                                     </div>
                                     {r.status === 'open' && (
                                         <button
@@ -429,11 +429,11 @@ const SessionLive = () => {
                                                 <div className="p-4 space-y-4">
                                                     <div>
                                                         <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Response</p>
-                                                        <p className="text-gray-800 bg-white p-3 rounded border border-gray-100">{resp.response_text}</p>
+                                                        <p className="text-gray-800 bg-white p-3 rounded border border-gray-100 whitespace-pre-wrap">{resp.response_text}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-xs font-semibold text-purple-600 uppercase mb-1">AI Feedback</p>
-                                                        <p className="text-purple-900 bg-purple-50 p-3 rounded border border-purple-100">{resp.ai_feedback}</p>
+                                                        <p className="text-purple-900 bg-purple-50 p-3 rounded border border-purple-100 whitespace-pre-wrap">{resp.ai_feedback}</p>
                                                     </div>
                                                 </div>
                                             </details>
