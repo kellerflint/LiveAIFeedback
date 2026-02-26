@@ -6,6 +6,7 @@ import { AuthContext } from '../../context/AuthContext';
 import Toast from '../../components/Toast';
 import ModelSearchModal from '../../components/admin/ModelSearchModal';
 import QuestionModal from '../../components/admin/QuestionModal';
+import DeleteCollectionModal from '../../components/admin/DeleteCollectionModal';
 
 const AdminDashboard = () => {
     const [questions, setQuestions] = useState([]);
@@ -20,8 +21,13 @@ const AdminDashboard = () => {
 
     // Collection management
     const [newCollectionName, setNewCollectionName] = useState('');
+    const [newCollectionNameError, setNewCollectionNameError] = useState('');
     const [renamingCollection, setRenamingCollection] = useState(null);
     const [renameText, setRenameText] = useState('');
+    const [renameTextError, setRenameTextError] = useState('');
+
+    // Delete collection modal
+    const [deleteCollectionTarget, setDeleteCollectionTarget] = useState(null); // collection object
 
     // Universal Question Modal State
     const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -76,7 +82,11 @@ const AdminDashboard = () => {
     // ===== Collection Management =====
     const handleCreateCollection = async (e) => {
         e.preventDefault();
-        if (!newCollectionName.trim()) return;
+        if (!newCollectionName.trim()) {
+            setNewCollectionNameError('Collection name cannot be empty.');
+            return;
+        }
+        setNewCollectionNameError('');
         try {
             const res = await api.post('/admin/collections', { name: newCollectionName.trim() });
             setCollections([...collections, res.data]);
@@ -88,7 +98,11 @@ const AdminDashboard = () => {
     };
 
     const handleRenameCollection = async (id) => {
-        if (!renameText.trim()) return;
+        if (!renameText.trim()) {
+            setRenameTextError('Name cannot be empty.');
+            return;
+        }
+        setRenameTextError('');
         try {
             await api.put(`/admin/collections/${id}`, { name: renameText.trim() });
             setCollections(collections.map(c => c.id === id ? { ...c, name: renameText.trim() } : c));
@@ -100,54 +114,41 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleDeleteCollection = async (id) => {
+    const handleDeleteCollection = (id) => {
         const collection = collections.find(c => c.id === id);
         if (!collection) return;
+        setDeleteCollectionTarget(collection);
+    };
 
+    const handleDeleteCollectionConfirm = async ({ action, targetId }) => {
+        const id = deleteCollectionTarget.id;
         const otherCollections = collections.filter(c => c.id !== id);
-        const hasQuestions = collection.question_count > 0;
+        setDeleteCollectionTarget(null);
 
-        if (hasQuestions) {
-            const action = window.prompt(
-                `Collection "${collection.name}" has ${collection.question_count} question(s).\n\nType "delete" to delete all questions, or enter the name of a collection to move them to:`
-            );
-            if (!action) return;
-
-            if (action.toLowerCase() === 'delete') {
-                try {
-                    await api.delete(`/admin/collections/${id}?action=delete`);
-                    setCollections(collections.filter(c => c.id !== id));
-                    setQuestions(questions.filter(q => q.collection_id !== id));
-                    if (filterCollectionId === id) setFilterCollectionId(null);
-                    setToast({ message: "Collection and questions deleted", type: 'success' });
-                } catch (e) {
-                    setToast({ message: "Failed to delete collection", type: 'error' });
-                }
-            } else {
-                const target = otherCollections.find(c => c.name.toLowerCase() === action.toLowerCase());
-                if (!target) {
-                    setToast({ message: `Collection "${action}" not found`, type: 'error' });
-                    return;
-                }
-                try {
-                    await api.delete(`/admin/collections/${id}?action=move&target_id=${target.id}`);
-                    setCollections(collections.filter(c => c.id !== id));
-                    setQuestions(questions.map(q => q.collection_id === id ? { ...q, collection_id: target.id, collection_name: target.name } : q));
-                    if (filterCollectionId === id) setFilterCollectionId(target.id);
-                    setToast({ message: `Questions moved to "${target.name}"`, type: 'success' });
-                } catch (e) {
-                    setToast({ message: "Failed to move questions", type: 'error' });
-                }
-            }
-        } else {
-            if (!window.confirm(`Delete empty collection "${collection.name}"?`)) return;
+        if (action === 'delete') {
             try {
                 await api.delete(`/admin/collections/${id}?action=delete`);
                 setCollections(collections.filter(c => c.id !== id));
+                setQuestions(questions.filter(q => q.collection_id !== id));
                 if (filterCollectionId === id) setFilterCollectionId(null);
-                setToast({ message: "Collection deleted", type: 'success' });
+                setToast({ message: "Collection and questions deleted", type: 'success' });
             } catch (e) {
                 setToast({ message: "Failed to delete collection", type: 'error' });
+            }
+        } else if (action === 'move') {
+            const target = otherCollections.find(c => c.id === targetId);
+            if (!target) {
+                setToast({ message: "Target collection not found", type: 'error' });
+                return;
+            }
+            try {
+                await api.delete(`/admin/collections/${id}?action=move&target_id=${target.id}`);
+                setCollections(collections.filter(c => c.id !== id));
+                setQuestions(questions.map(q => q.collection_id === id ? { ...q, collection_id: target.id, collection_name: target.name } : q));
+                if (filterCollectionId === id) setFilterCollectionId(target.id);
+                setToast({ message: `Questions moved to "${target.name}"`, type: 'success' });
+            } catch (e) {
+                setToast({ message: "Failed to move questions", type: 'error' });
             }
         }
     };
@@ -303,15 +304,20 @@ const AdminDashboard = () => {
                             {collections.map(c => (
                                 <div key={c.id} className="flex items-center gap-1 group">
                                     {renamingCollection === c.id ? (
-                                        <form onSubmit={(e) => { e.preventDefault(); handleRenameCollection(c.id); }} className="flex items-center gap-1">
-                                            <input
-                                                type="text"
-                                                value={renameText}
-                                                onChange={e => setRenameText(e.target.value)}
-                                                className="px-2 py-1 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 w-32"
-                                                autoFocus
-                                                onBlur={() => setRenamingCollection(null)}
-                                            />
+                                        <form onSubmit={(e) => { e.preventDefault(); handleRenameCollection(c.id); }} className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1">
+                                                <input
+                                                    type="text"
+                                                    value={renameText}
+                                                    onChange={e => { setRenameText(e.target.value); setRenameTextError(''); }}
+                                                    className={`px-2 py-1 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 w-32 ${renameTextError ? 'border-red-400' : 'border-blue-300'}`}
+                                                    autoFocus
+                                                    onBlur={() => { setRenamingCollection(null); setRenameTextError(''); }}
+                                                />
+                                            </div>
+                                            {renameTextError && (
+                                                <p className="text-xs text-red-500 pl-0.5">{renameTextError}</p>
+                                            )}
                                         </form>
                                     ) : (
                                         <button
@@ -343,20 +349,27 @@ const AdminDashboard = () => {
                                 </div>
                             ))}
                         </div>
-                        <form onSubmit={handleCreateCollection} className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newCollectionName}
-                                onChange={e => setNewCollectionName(e.target.value)}
-                                placeholder="New collection name..."
-                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            <button
-                                type="submit"
-                                className="px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5"
-                            >
-                                <PlusCircle className="w-4 h-4" /> Add
-                            </button>
+                        <form onSubmit={handleCreateCollection} className="flex flex-col gap-1.5">
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newCollectionName}
+                                    onChange={e => { setNewCollectionName(e.target.value); setNewCollectionNameError(''); }}
+                                    placeholder="New collection name..."
+                                    data-testid="new-collection-name-input"
+                                    className={`px-3 py-2 border rounded-lg text-sm flex-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${newCollectionNameError ? 'border-red-400 focus:ring-red-400 focus:border-red-400' : 'border-gray-300'}`}
+                                />
+                                <button
+                                    type="submit"
+                                    data-testid="add-collection-button"
+                                    className="px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5"
+                                >
+                                    <PlusCircle className="w-4 h-4" /> Add
+                                </button>
+                            </div>
+                            {newCollectionNameError && (
+                                <p className="text-xs text-red-500 pl-1">{newCollectionNameError}</p>
+                            )}
                         </form>
                     </div>
                 </div>
@@ -490,6 +503,15 @@ const AdminDashboard = () => {
                     </div>
                 )}
             </main>
+
+            {/* Delete Collection Modal */}
+            <DeleteCollectionModal
+                show={!!deleteCollectionTarget}
+                collection={deleteCollectionTarget}
+                otherCollections={collections.filter(c => c.id !== deleteCollectionTarget?.id)}
+                onCancel={() => setDeleteCollectionTarget(null)}
+                onConfirm={handleDeleteCollectionConfirm}
+            />
 
             {/* Model Search Modal */}
             <ModelSearchModal
