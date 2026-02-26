@@ -3,8 +3,7 @@
  * Each function accepts a Playwright Page object (and any necessary args)
  * and performs a well-known, repeatable UI flow.
  *
- * Intentionally does NOT make assertions beyond the minimum needed to
- * confirm the flow completed — tests own their own assertion logic.
+ * Intentionally does NOT make assertions. Tests own their own assertion logic.
  */
 
 const { expect } = require('@playwright/test');

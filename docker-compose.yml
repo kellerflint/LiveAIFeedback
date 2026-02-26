@@ -45,6 +45,10 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    env_file:
+      - .env
+    environment:
+      - DOMAIN
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
