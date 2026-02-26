@@ -47,7 +47,7 @@ const StudentJoin = () => {
 
                 <form onSubmit={handleJoin} className="space-y-6">
                     {error && (
-                        <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm text-center">
+                        <div data-testid="session-error-message" className="p-3 bg-red-50 text-red-700 rounded-lg text-sm text-center">
                             {error}
                         </div>
                     )}
@@ -60,6 +60,7 @@ const StudentJoin = () => {
                             placeholder="e.g. XYZ123"
                             value={code}
                             onChange={(e) => setCode(e.target.value)}
+                            data-testid="session-code-input"
                             className="w-full px-4 py-3 text-lg font-mono tracking-widest uppercase border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                         />
                     </div>
@@ -67,6 +68,7 @@ const StudentJoin = () => {
                     <button
                         type="submit"
                         disabled={loading || !code}
+                        data-testid="join-session-button"
                         className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-3 font-medium hover:bg-blue-700 transition disabled:opacity-70 text-lg shadow-md hover:shadow-lg"
                     >
                         <LogIn className="w-5 h-5" />

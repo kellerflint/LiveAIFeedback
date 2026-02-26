@@ -7,11 +7,22 @@ CREATE TABLE IF NOT EXISTS admin_user (
   password_hash VARCHAR(255) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS collection (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed a default collection
+INSERT INTO collection (id, name) VALUES (1, 'Default');
+
 CREATE TABLE IF NOT EXISTS question (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  collection_id INT NOT NULL DEFAULT 1,
   text TEXT NOT NULL,
   grading_criteria TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (collection_id) REFERENCES collection(id) ON DELETE CASCADE
 );
 
 

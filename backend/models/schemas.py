@@ -20,6 +20,7 @@ class TokenData(BaseModel):
 class QuestionBase(BaseModel):
     text: str
     grading_criteria: str
+    collection_id: int = 1
 
 class QuestionCreate(QuestionBase):
     pass
@@ -27,6 +28,26 @@ class QuestionCreate(QuestionBase):
 class Question(QuestionBase):
     id: int
     created_at: datetime
+    collection_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# ==========================================
+# Collection Schemas
+# ==========================================
+
+class CollectionCreate(BaseModel):
+    name: str
+
+class CollectionRename(BaseModel):
+    name: str
+
+class Collection(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    question_count: Optional[int] = 0
 
     class Config:
         from_attributes = True

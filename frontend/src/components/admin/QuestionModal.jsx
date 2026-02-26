@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 
-const QuestionModal = ({ show, onClose, onSave, editingQuestion = null }) => {
+const QuestionModal = ({ show, onClose, onSave, editingQuestion = null, collections = [] }) => {
     const [text, setText] = useState('');
     const [gradingCriteria, setGradingCriteria] = useState('');
+    const [collectionId, setCollectionId] = useState(1);
 
     useEffect(() => {
         if (show) {
             if (editingQuestion) {
                 setText(editingQuestion.text);
                 setGradingCriteria(editingQuestion.grading_criteria);
+                setCollectionId(editingQuestion.collection_id || 1);
             } else {
                 setText('');
                 setGradingCriteria('');
+                setCollectionId(1);
             }
         }
     }, [show, editingQuestion]);
@@ -21,7 +24,7 @@ const QuestionModal = ({ show, onClose, onSave, editingQuestion = null }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave({ text, grading_criteria: gradingCriteria });
+        onSave({ text, grading_criteria: gradingCriteria, collection_id: collectionId });
     };
 
     return (
@@ -48,6 +51,7 @@ const QuestionModal = ({ show, onClose, onSave, editingQuestion = null }) => {
                             value={text}
                             onChange={e => setText(e.target.value)}
                             placeholder="e.g. What is the powerhouse of the cell?"
+                            data-testid="question-text-input"
                             autoFocus
                         />
                     </div>
@@ -66,8 +70,26 @@ const QuestionModal = ({ show, onClose, onSave, editingQuestion = null }) => {
                             value={gradingCriteria}
                             onChange={e => setGradingCriteria(e.target.value)}
                             placeholder="e.g. 4 pts for 'Mitochondria'. 1 pt for any other organelle."
+                            data-testid="grading-criteria-input"
                         />
                     </div>
+
+                    {collections.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Collection
+                            </label>
+                            <select
+                                value={collectionId}
+                                onChange={e => setCollectionId(Number(e.target.value))}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            >
+                                {collections.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                         <button
@@ -79,6 +101,7 @@ const QuestionModal = ({ show, onClose, onSave, editingQuestion = null }) => {
                         </button>
                         <button
                             type="submit"
+                            data-testid="save-question-button"
                             className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2 transition shadow-sm"
                         >
                             <Save className="w-4 h-4" />

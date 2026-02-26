@@ -184,6 +184,7 @@ const StudentActiveSession = () => {
                                 <input
                                     type="text"
                                     id="studentName"
+                                    data-testid="student-name-input"
                                     value={studentName}
                                     onChange={(e) => setStudentName(e.target.value)}
                                     className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-3 border"
@@ -194,6 +195,7 @@ const StudentActiveSession = () => {
                             </div>
                             <button
                                 type="submit"
+                                data-testid="enter-session-button"
                                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium shadow-sm transition"
                             >
                                 Enter Session
@@ -213,7 +215,7 @@ const StudentActiveSession = () => {
                     <div className="mx-auto w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6 animate-pulse">
                         <Clock className="w-8 h-8" />
                     </div>
-                    <h2 className="text-2xl font-semibold text-gray-900">Waiting for next question</h2>
+                    <h2 className="text-2xl font-semibold text-gray-900" data-testid="waiting-for-next-question">Waiting for next question</h2>
                     <p className="text-gray-500">The instructor has not launched any questions yet. This page will update automatically when they do.</p>
                 </div>
             </div>
@@ -271,11 +273,11 @@ const StudentActiveSession = () => {
                                                     <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2 block flex items-center gap-2">
                                                         AI Teaching Assistant
                                                     </span>
-                                                    <p className="text-indigo-900 font-medium leading-relaxed">{subStatus.feedback}</p>
+                                                    <p className="text-indigo-900 font-medium leading-relaxed" data-testid="response-feedback">{subStatus.feedback}</p>
                                                 </div>
                                                 <div className="text-center bg-white py-2 px-4 rounded-lg shadow-sm border border-indigo-100 flex flex-col items-center justify-center">
                                                     <span className="text-sm font-bold text-gray-500 uppercase">Score</span>
-                                                    <span className="text-3xl font-extrabold text-indigo-600">{subStatus.score}<span className="text-lg text-gray-400">/4</span></span>
+                                                    <span className="text-3xl font-extrabold text-indigo-600" data-testid="response-score">{subStatus.score}<span className="text-lg text-gray-400">/4</span></span>
                                                 </div>
                                             </div>
                                         </div>
@@ -286,6 +288,7 @@ const StudentActiveSession = () => {
                                             disabled={isLoading}
                                             rows={5}
                                             placeholder="Type your answer here..."
+                                            data-testid={`question-response-textarea-${uniqueId}`}
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow resize-y shadow-sm text-gray-800 disabled:opacity-50 disabled:bg-gray-100"
                                             value={responses[uniqueId] || ''}
                                             onChange={e => handleResponseChange(uniqueId, e.target.value)}
@@ -295,6 +298,7 @@ const StudentActiveSession = () => {
                                             <button
                                                 onClick={() => submitAnswer(q)}
                                                 disabled={isLoading || !(responses[uniqueId] || '').trim()}
+                                                data-testid={`submit-answer-button-${uniqueId}`}
                                                 className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 {isLoading ? (

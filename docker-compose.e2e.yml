@@ -13,6 +13,11 @@ services:
     volumes:
       # No persistent volume mount. Pure ephemeral isolation.
       - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pmy-secret-pw"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend-e2e:
     build: ./backend

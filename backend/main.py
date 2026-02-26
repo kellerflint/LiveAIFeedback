@@ -4,7 +4,7 @@ import logging
 import sys
 
 from db.session import init_db_pool, close_db_pool
-from api import admin_auth, questions, admin_sessions, student
+from api import admin_auth, questions, admin_sessions, student, collections
 
 # Configure Application Logging
 logging.basicConfig(
@@ -41,5 +41,6 @@ async def health_check():
 # Include routers
 app.include_router(admin_auth.router, prefix="/api/admin", tags=["Admin Auth"])
 app.include_router(questions.router, prefix="/api/admin", tags=["Questions"])
+app.include_router(collections.router, prefix="/api/admin", tags=["Collections"])
 app.include_router(admin_sessions.router, prefix="/api/admin", tags=["Admin Sessions"])
 app.include_router(student.router, prefix="/api/student", tags=["Student"])

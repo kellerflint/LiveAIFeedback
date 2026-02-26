@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
-import { PlusCircle, PlayCircle, LogOut, Trash2, Search, X, Bot } from 'lucide-react';
+import { PlusCircle, PlayCircle, LogOut, Trash2, Search, X, Bot, FolderOpen, Pencil } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import Toast from '../../components/Toast';
 import ModelSearchModal from '../../components/admin/ModelSearchModal';
@@ -10,9 +10,18 @@ import QuestionModal from '../../components/admin/QuestionModal';
 const AdminDashboard = () => {
     const [questions, setQuestions] = useState([]);
     const [sessions, setSessions] = useState([]);
+    const [collections, setCollections] = useState([]);
     const [loading, setLoading] = useState(true);
     const { logout } = React.useContext(AuthContext);
     const navigate = useNavigate();
+
+    // Collection filter
+    const [filterCollectionId, setFilterCollectionId] = useState(null); // null = All
+
+    // Collection management
+    const [newCollectionName, setNewCollectionName] = useState('');
+    const [renamingCollection, setRenamingCollection] = useState(null);
+    const [renameText, setRenameText] = useState('');
 
     // Universal Question Modal State
     const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -35,12 +44,14 @@ const AdminDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const [qRes, sRes] = await Promise.all([
+            const [qRes, sRes, cRes] = await Promise.all([
                 api.get('/admin/questions'),
-                api.get('/admin/sessions')
+                api.get('/admin/sessions'),
+                api.get('/admin/collections')
             ]);
             setQuestions(qRes.data);
             setSessions(sRes.data);
+            setCollections(cRes.data);
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -49,7 +60,7 @@ const AdminDashboard = () => {
     };
 
     const fetchModels = async () => {
-        if (openRouterModels.length > 0) return; // Cache
+        if (openRouterModels.length > 0) return;
         try {
             setModelsLoading(true);
             const res = await api.get('/admin/models');
@@ -62,6 +73,86 @@ const AdminDashboard = () => {
         }
     };
 
+    // ===== Collection Management =====
+    const handleCreateCollection = async (e) => {
+        e.preventDefault();
+        if (!newCollectionName.trim()) return;
+        try {
+            const res = await api.post('/admin/collections', { name: newCollectionName.trim() });
+            setCollections([...collections, res.data]);
+            setNewCollectionName('');
+            setToast({ message: "Collection created", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to create collection", type: 'error' });
+        }
+    };
+
+    const handleRenameCollection = async (id) => {
+        if (!renameText.trim()) return;
+        try {
+            await api.put(`/admin/collections/${id}`, { name: renameText.trim() });
+            setCollections(collections.map(c => c.id === id ? { ...c, name: renameText.trim() } : c));
+            setRenamingCollection(null);
+            setRenameText('');
+            setToast({ message: "Collection renamed", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to rename collection", type: 'error' });
+        }
+    };
+
+    const handleDeleteCollection = async (id) => {
+        const collection = collections.find(c => c.id === id);
+        if (!collection) return;
+
+        const otherCollections = collections.filter(c => c.id !== id);
+        const hasQuestions = collection.question_count > 0;
+
+        if (hasQuestions) {
+            const action = window.prompt(
+                `Collection "${collection.name}" has ${collection.question_count} question(s).\n\nType "delete" to delete all questions, or enter the name of a collection to move them to:`
+            );
+            if (!action) return;
+
+            if (action.toLowerCase() === 'delete') {
+                try {
+                    await api.delete(`/admin/collections/${id}?action=delete`);
+                    setCollections(collections.filter(c => c.id !== id));
+                    setQuestions(questions.filter(q => q.collection_id !== id));
+                    if (filterCollectionId === id) setFilterCollectionId(null);
+                    setToast({ message: "Collection and questions deleted", type: 'success' });
+                } catch (e) {
+                    setToast({ message: "Failed to delete collection", type: 'error' });
+                }
+            } else {
+                const target = otherCollections.find(c => c.name.toLowerCase() === action.toLowerCase());
+                if (!target) {
+                    setToast({ message: `Collection "${action}" not found`, type: 'error' });
+                    return;
+                }
+                try {
+                    await api.delete(`/admin/collections/${id}?action=move&target_id=${target.id}`);
+                    setCollections(collections.filter(c => c.id !== id));
+                    setQuestions(questions.map(q => q.collection_id === id ? { ...q, collection_id: target.id, collection_name: target.name } : q));
+                    if (filterCollectionId === id) setFilterCollectionId(target.id);
+                    setToast({ message: `Questions moved to "${target.name}"`, type: 'success' });
+                } catch (e) {
+                    setToast({ message: "Failed to move questions", type: 'error' });
+                }
+            }
+        } else {
+            if (!window.confirm(`Delete empty collection "${collection.name}"?`)) return;
+            try {
+                await api.delete(`/admin/collections/${id}?action=delete`);
+                setCollections(collections.filter(c => c.id !== id));
+                if (filterCollectionId === id) setFilterCollectionId(null);
+                setToast({ message: "Collection deleted", type: 'success' });
+            } catch (e) {
+                setToast({ message: "Failed to delete collection", type: 'error' });
+            }
+        }
+    };
+
+    // ===== Question Management =====
     const handleSaveQuestion = async (questionData) => {
         try {
             if (editingQuestion) {
@@ -75,6 +166,9 @@ const AdminDashboard = () => {
             }
             setShowQuestionModal(false);
             setEditingQuestion(null);
+            // Refresh collections to update question counts
+            const cRes = await api.get('/admin/collections');
+            setCollections(cRes.data);
         } catch (error) {
             setToast({ message: editingQuestion ? "Failed to update question" : "Failed to create question", type: 'error' });
         }
@@ -82,16 +176,18 @@ const AdminDashboard = () => {
 
     const handleDeleteQuestion = async (id) => {
         if (!window.confirm("Are you sure you want to delete this question? This will delete all student responses attached to it.")) return;
-
         try {
             await api.delete(`/admin/questions/${id}`);
             setQuestions(questions.filter(q => q.id !== id));
+            const cRes = await api.get('/admin/collections');
+            setCollections(cRes.data);
             setToast({ message: "Question deleted successfully", type: 'success' });
         } catch (error) {
             setToast({ message: "Failed to delete question", type: 'error' });
         }
     };
 
+    // ===== Session Management =====
     const handleEndSession = async (id) => {
         if (!window.confirm("End this session? Students will be disconnected.")) return;
         try {
@@ -125,13 +221,8 @@ const AdminDashboard = () => {
 
     const startSessionImpl = async (modelToUse) => {
         try {
-            // The endpoint returns a primitive string for the code when doing rapid creation, 
-            // but the test expects an object. Let's fix the schema but also be resilient here.
             const res = await api.post('/admin/sessions', { ai_model: modelToUse });
-
-            // Check if backend returned string directly or an object with a code property
             const code = typeof res.data === 'string' ? res.data : res.data?.code;
-
             if (!code) throw new Error("Could not parse session code from response");
             navigate(`/admin/session/${code}`);
         } catch (error) {
@@ -150,6 +241,10 @@ const AdminDashboard = () => {
         }
         await startSessionImpl(selectedModel);
     };
+
+    const filteredQuestions = filterCollectionId
+        ? questions.filter(q => q.collection_id === filterCollectionId)
+        : questions;
 
     return (
         <div className="min-h-screen bg-gray-50 pb-12">
@@ -171,6 +266,7 @@ const AdminDashboard = () => {
                     {sessions.find(s => s.status === 'active') ? (
                         <button
                             onClick={() => navigate(`/admin/session/${sessions.find(s => s.status === 'active').code}`)}
+                            data-testid="open-active-session-button"
                             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-sm font-medium"
                         >
                             <PlayCircle className="w-5 h-5" />
@@ -179,6 +275,7 @@ const AdminDashboard = () => {
                     ) : (
                         <button
                             onClick={startSession}
+                            data-testid="start-session-button"
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-medium"
                         >
                             <PlayCircle className="w-5 h-5" />
@@ -192,10 +289,91 @@ const AdminDashboard = () => {
             </nav>
 
             <main className="max-w-6xl mx-auto px-6 mt-8">
+                {/* Collection Management Section */}
+                <div className="mb-8">
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-4">Collections</h2>
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                        <div className="flex flex-wrap gap-2 items-center mb-4">
+                            <button
+                                onClick={() => setFilterCollectionId(null)}
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${filterCollectionId === null ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            >
+                                All ({questions.length})
+                            </button>
+                            {collections.map(c => (
+                                <div key={c.id} className="flex items-center gap-1 group">
+                                    {renamingCollection === c.id ? (
+                                        <form onSubmit={(e) => { e.preventDefault(); handleRenameCollection(c.id); }} className="flex items-center gap-1">
+                                            <input
+                                                type="text"
+                                                value={renameText}
+                                                onChange={e => setRenameText(e.target.value)}
+                                                className="px-2 py-1 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 w-32"
+                                                autoFocus
+                                                onBlur={() => setRenamingCollection(null)}
+                                            />
+                                        </form>
+                                    ) : (
+                                        <button
+                                            onClick={() => setFilterCollectionId(c.id)}
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${filterCollectionId === c.id ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                        >
+                                            <FolderOpen className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                                            {c.name} ({c.question_count})
+                                        </button>
+                                    )}
+                                    {c.id !== 1 && (
+                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                                            <button
+                                                onClick={() => { setRenamingCollection(c.id); setRenameText(c.name); }}
+                                                className="p-1 text-gray-400 hover:text-blue-600 rounded"
+                                                title="Rename"
+                                            >
+                                                <Pencil className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteCollection(c.id)}
+                                                className="p-1 text-gray-400 hover:text-red-500 rounded"
+                                                title="Delete Collection"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <form onSubmit={handleCreateCollection} className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newCollectionName}
+                                onChange={e => setNewCollectionName(e.target.value)}
+                                placeholder="New collection name..."
+                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5"
+                            >
+                                <PlusCircle className="w-4 h-4" /> Add
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {/* Question Bank */}
                 <div className="flex justify-between items-end mb-6">
-                    <h2 className="text-2xl font-semibold text-gray-900">Question Bank</h2>
+                    <h2 className="text-2xl font-semibold text-gray-900">
+                        Question Bank
+                        {filterCollectionId && collections.find(c => c.id === filterCollectionId) && (
+                            <span className="text-base text-gray-500 font-normal ml-2">
+                                — {collections.find(c => c.id === filterCollectionId)?.name}
+                            </span>
+                        )}
+                    </h2>
                     <button
                         onClick={() => { setEditingQuestion(null); setShowQuestionModal(true); }}
+                        data-testid="new-question-button"
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
                     >
                         <PlusCircle className="w-5 h-5" /> New Question
@@ -206,24 +384,34 @@ const AdminDashboard = () => {
                     <div className="text-center py-12 text-gray-500">Loading library...</div>
                 ) : (
                     <div className="bg-white border text-left border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                        {questions.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">No questions in your bank yet. Create one!</div>
+                        {filteredQuestions.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">
+                                {filterCollectionId ? 'No questions in this collection.' : 'No questions in your bank yet. Create one!'}
+                            </div>
                         ) : (
                             <ul className="divide-y divide-gray-200">
-                                {questions.map(q => (
-                                    <li key={q.id} className="p-6 hover:bg-gray-50 transition relative group">
+                                {filteredQuestions.map(q => (
+                                    <li key={q.id} data-testid={`question-card-${q.id}`} className="p-6 hover:bg-gray-50 transition relative group">
                                         <div className="flex justify-between items-start mb-2">
-                                            <p className="font-medium text-gray-900 text-lg pr-16">{q.text}</p>
+                                            <div>
+                                                <p className="font-medium text-gray-900 text-lg pr-16">{q.text}</p>
+                                                {q.collection_name && (
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full mt-1 inline-block">
+                                                        {q.collection_name}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="absolute right-6 top-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
                                                 <button
                                                     onClick={() => { setEditingQuestion(q); setShowQuestionModal(true); }}
                                                     className="text-gray-400 hover:text-blue-600 transition p-1 rounded-md hover:bg-blue-50"
                                                     title="Edit Question"
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                                    <Pencil className="w-5 h-5" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteQuestion(q.id)}
+                                                    data-testid={`delete-question-button-${q.id}`}
                                                     className="text-gray-400 hover:text-red-500 transition p-1 rounded-md hover:bg-red-50"
                                                     title="Delete Question"
                                                 >
@@ -283,7 +471,7 @@ const AdminDashboard = () => {
                                                 <div className="flex justify-end gap-2">
                                                     {s.status === 'active' ? (
                                                         <>
-                                                            <button onClick={() => handleEndSession(s.id)} className="px-3 py-1.5 bg-red-50 text-red-600 text-sm font-medium rounded hover:bg-red-100 transition">End Session</button>
+                                                            <button onClick={() => handleEndSession(s.id)} data-testid={`end-session-button-${s.id}`} className="px-3 py-1.5 bg-red-50 text-red-600 text-sm font-medium rounded hover:bg-red-100 transition">End Session</button>
                                                             <button onClick={() => navigate(`/admin/session/${s.code}`)} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded hover:bg-blue-100 transition">Open</button>
                                                         </>
                                                     ) : (
@@ -324,6 +512,7 @@ const AdminDashboard = () => {
                 onClose={() => { setShowQuestionModal(false); setEditingQuestion(null); }}
                 onSave={handleSaveQuestion}
                 editingQuestion={editingQuestion}
+                collections={collections}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

@@ -98,6 +98,16 @@ class SessionRepository:
                 )
 
     @staticmethod
+    async def close_all_questions(session_id: int):
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE session_question SET status = 'closed' WHERE session_id = %s AND status = 'open'",
+                    (session_id,)
+                )
+
+    @staticmethod
     async def get_active_questions(session_id: int) -> list:
         pool = await get_db_pool()
         async with pool.acquire() as conn:

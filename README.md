@@ -47,6 +47,15 @@ A dockerized web application for collecting and AI-grading student responses in 
 - **Admin Dashboard**: `https://your-domain.com/admin/login`
   - **Username**: `admin` | **Password**: `admin`
 
+## Database Migrations
+
+When the database schema changes (e.g., new tables or columns), the persistent DB volume must be reset:
+```bash
+docker compose down -v          # Removes containers AND the db_data volume
+docker compose up -d --build    # Rebuilds and re-runs init.sql from scratch
+```
+> **Warning:** This deletes all existing data. Export any important session results via CSV before running.
+
 ## E2E Testing
 
 We use Playwright with a fully isolated ephemeral Docker stack to prevent test data from polluting your live database.
@@ -59,4 +68,3 @@ cd ..
 # Run the test suite
 ./e2e_tests/run_e2e.sh
 ```
-

@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 import asyncio
 import httpx
+import csv
+import io
 import logging
 from typing import List
 from api.admin_auth import get_current_admin
 from db.session_repo import SessionRepository
+from db.question_repo import QuestionRepository
 from models.schemas import Session, SessionCreate, SessionQuestion
 from api.student import manager
 
@@ -82,6 +86,48 @@ async def get_connected_users(session_id: int, current_user: dict = Depends(get_
         "count": len(names),
         "names": names
     }
+
+@router.post("/sessions/{session_id}/launch-collection/{collection_id}")
+async def launch_collection(session_id: int, collection_id: int, current_user: dict = Depends(get_current_admin)):
+    questions = await QuestionRepository.get_by_collection(collection_id)
+    if not questions:
+        raise HTTPException(status_code=404, detail="No questions in this collection")
+    launched = []
+    for q in questions:
+        sq_id = await SessionRepository.launch_question(session_id, q['id'])
+        launched.append(sq_id)
+    active = await SessionRepository.get_active_questions(session_id)
+    await manager.broadcast(session_id, {"type": "active_questions", "questions": active})
+    return {"launched": len(launched), "session_question_ids": launched}
+
+@router.put("/sessions/{session_id}/close-all-questions")
+async def close_all_questions(session_id: int, current_user: dict = Depends(get_current_admin)):
+    await SessionRepository.close_all_questions(session_id)
+    await manager.broadcast(session_id, {"type": "active_questions", "questions": []})
+    return {"status": "all closed"}
+
+@router.get("/sessions/{session_id}/export-csv")
+async def export_csv(session_id: int, current_user: dict = Depends(get_current_admin)):
+    results = await SessionRepository.fetch_results(session_id)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Question", "Student Name", "Response", "AI Score", "AI Feedback", "Timestamp"])
+    for sq in results:
+        for r in sq.get('responses', []):
+            writer.writerow([
+                sq.get('text', ''),
+                r.get('student_name', ''),
+                r.get('response_text', ''),
+                r.get('ai_score', ''),
+                r.get('ai_feedback', ''),
+                str(r.get('created_at', ''))
+            ])
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=session_{session_id}_results.csv"}
+    )
 
 @router.get("/sessions/{session_id}/live-results")
 async def stream_session_results(request: Request, session_id: int):

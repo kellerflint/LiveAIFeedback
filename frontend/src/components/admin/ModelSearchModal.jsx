@@ -43,6 +43,7 @@ const ModelSearchModal = ({
                         <div className="grid gap-3">
                             <div
                                 onClick={() => { setSelectedModel('test-model'); onClose(); }}
+                                data-testid="model-option-test-model"
                                 className={`p-4 rounded-lg border cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition bg-white ${selectedModel === 'test-model' ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'}`}
                             >
                                 <div className="font-semibold text-gray-900">test-model</div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { getBaseUrl } from '../../api';
-import { Play, Square, Users, Copy, ArrowLeft, X, Power, PlusCircle, AlertCircle } from 'lucide-react';
+import { Play, Square, Users, Copy, ArrowLeft, X, Power, PlusCircle, AlertCircle, Download, FolderOpen, Search, StopCircle } from 'lucide-react';
 import Toast from '../../components/Toast';
 import ConnectedUsersModal from '../../components/admin/ConnectedUsersModal';
 import QuestionModal from '../../components/admin/QuestionModal';
@@ -11,6 +11,7 @@ const SessionLive = () => {
     const navigate = useNavigate();
     const [session, setSession] = useState(null);
     const [questions, setQuestions] = useState([]);
+    const [collections, setCollections] = useState([]);
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
@@ -19,6 +20,10 @@ const SessionLive = () => {
     const [showUsersModal, setShowUsersModal] = useState(false);
     const [showNewQuestionModal, setShowNewQuestionModal] = useState(false);
 
+    // Collection filter for sidebar
+    const [selectedCollectionId, setSelectedCollectionId] = useState(null);
+    const [collectionSearch, setCollectionSearch] = useState('');
+
     useEffect(() => {
         fetchInitialData();
     }, [sessionCode]);
@@ -26,7 +31,6 @@ const SessionLive = () => {
     useEffect(() => {
         if (!session) return;
 
-        // Setup SSE for real-time results
         const sseUrl = `${getBaseUrl()}/api/admin/sessions/${session.id}/live-results`;
         const sse = new EventSource(sseUrl);
 
@@ -58,15 +62,18 @@ const SessionLive = () => {
 
     const fetchInitialData = async () => {
         try {
-            // 1. Get session by code to get the ID
-            const sessRes = await api.get(`/admin/sessions/${sessionCode}`);
+            const [sessRes, qRes, cRes] = await Promise.all([
+                api.get(`/admin/sessions/${sessionCode}`),
+                api.get('/admin/questions'),
+                api.get('/admin/collections')
+            ]);
             setSession(sessRes.data);
-
-            // 2. Get questions library
-            const qRes = await api.get('/admin/questions');
             setQuestions(qRes.data);
-
-            setLoading(false);
+            setCollections(cRes.data);
+            // Default to first collection if available
+            if (cRes.data.length > 0) {
+                setSelectedCollectionId(cRes.data[0].id);
+            }
             setLoading(false);
         } catch (e) {
             console.error(e);
@@ -95,6 +102,17 @@ const SessionLive = () => {
         }
     };
 
+    const launchCollection = async () => {
+        if (!session || !selectedCollectionId) return;
+        try {
+            const res = await api.post(`/admin/sessions/${session.id}/launch-collection/${selectedCollectionId}`);
+            pollResults();
+            setToast({ message: `Launched ${res.data.launched} question(s) to students`, type: 'success' });
+        } catch (e) {
+            setToast({ message: e.response?.data?.detail || "Failed to launch collection", type: 'error' });
+        }
+    };
+
     const closeQuestion = async (sessionQuestionId) => {
         try {
             await api.put(`/admin/sessions/${session.id}/question/${sessionQuestionId}/close`);
@@ -105,12 +123,45 @@ const SessionLive = () => {
         }
     };
 
+    const closeAllQuestions = async () => {
+        if (!session) return;
+        if (!window.confirm("Close all open questions?")) return;
+        try {
+            await api.put(`/admin/sessions/${session.id}/close-all-questions`);
+            pollResults();
+            setToast({ message: "All questions closed", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to close questions", type: 'error' });
+        }
+    };
+
+    const downloadCSV = async () => {
+        if (!session) return;
+        try {
+            const res = await api.get(`/admin/sessions/${session.id}/export-csv`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `session_${session.id}_results.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            setToast({ message: "CSV downloaded!", type: 'success' });
+        } catch (e) {
+            setToast({ message: "Failed to download CSV", type: 'error' });
+        }
+    };
+
     const handleCreateQuestion = async (questionData) => {
         try {
             const res = await api.post('/admin/questions', questionData);
             setQuestions([res.data, ...questions]);
             setShowNewQuestionModal(false);
             setToast({ message: "Question added to bank", type: 'success' });
+            // Refresh collections to update counts
+            const cRes = await api.get('/admin/collections');
+            setCollections(cRes.data);
         } catch (error) {
             setToast({ message: "Failed to create question", type: 'error' });
         }
@@ -132,6 +183,18 @@ const SessionLive = () => {
         navigator.clipboard.writeText(link);
         setToast({ message: "Shareable link copied!", type: 'success' });
     };
+
+    // Filtered collections for search dropdown
+    const filteredCollections = collections.filter(c =>
+        c.name.toLowerCase().includes(collectionSearch.toLowerCase())
+    );
+
+    // Questions for the currently selected collection
+    const sidebarQuestions = selectedCollectionId
+        ? questions.filter(q => q.collection_id === selectedCollectionId)
+        : questions;
+
+    const hasOpenQuestions = results.some(r => r.status === 'open');
 
     if (loading) return <div className="p-12 text-center text-gray-500">Loading session...</div>;
 
@@ -160,6 +223,7 @@ const SessionLive = () => {
                     {session?.status === 'active' && (
                         <button
                             onClick={handleEndSession}
+                            data-testid="end-session-button"
                             className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition shadow-sm mr-2"
                         >
                             <Power className="w-4 h-4" /> End Session
@@ -172,7 +236,10 @@ const SessionLive = () => {
                         <Users className="w-4 h-4" />
                         <span>{connectedUsers} {connectedUsers === 1 ? 'Student' : 'Students'}</span>
                     </button>
-                    <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg font-mono font-bold text-lg border border-gray-200 flex items-center gap-3">
+                    <div
+                        data-testid="session-code-display"
+                        className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg font-mono font-bold text-lg border border-gray-200 flex items-center gap-3"
+                    >
                         {sessionCode}
                         <button onClick={copyLink} className="text-gray-400 hover:text-blue-600"><Copy className="w-4 h-4" /></button>
                     </div>
@@ -180,42 +247,109 @@ const SessionLive = () => {
             </header>
 
             <div className="flex-1 flex overflow-hidden">
-                {/* Left Sidebar: Library */}
+                {/* Left Sidebar: Collection-based Question Library */}
                 {session?.status === 'active' && (
                     <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-full overflow-hidden">
-                        <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center z-10">
-                            <h2 className="font-semibold text-gray-900">Question Library</h2>
-                            <button
-                                onClick={() => setShowNewQuestionModal(true)}
-                                className="text-blue-600 hover:text-blue-700 transition"
-                                title="Create New Question"
-                            >
-                                <PlusCircle className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            {questions.map(q => (
-                                <div key={q.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-300 transition shadow-sm">
-                                    <p className="text-gray-900 font-medium mb-3">{q.text}</p>
-                                    <button
-                                        onClick={() => launchQuestion(q.id)}
-                                        className="w-full py-2 bg-blue-50 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm"
+                        {/* Sidebar Header with Collection Dropdown */}
+                        <div className="p-4 border-b border-gray-200 bg-gray-50 space-y-3">
+                            <div className="flex justify-between items-center">
+                                <h2 className="font-semibold text-gray-900">Question Library</h2>
+                                <button
+                                    onClick={() => setShowNewQuestionModal(true)}
+                                    data-testid="new-question-button"
+                                    className="text-blue-600 hover:text-blue-700 transition"
+                                    title="Create New Question"
+                                >
+                                    <PlusCircle className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Searchable Collection Dropdown */}
+                            <div className="relative">
+                                <div className="relative">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <select
+                                        value={selectedCollectionId || ''}
+                                        onChange={e => setSelectedCollectionId(e.target.value ? Number(e.target.value) : null)}
+                                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
                                     >
-                                        <Play className="w-4 h-4" /> Launch to Students
-                                    </button>
+                                        <option value="">All Questions</option>
+                                        {filteredCollections.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name} ({c.question_count})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                            ))}
+                            </div>
+
+                            {/* Launch All Button */}
+                            {selectedCollectionId && sidebarQuestions.length > 0 && (
+                                <button
+                                    onClick={launchCollection}
+                                    data-testid="launch-collection-button"
+                                    className="w-full py-2 bg-green-50 text-green-700 font-medium rounded-lg hover:bg-green-100 transition flex items-center justify-center gap-2 text-sm border border-green-200"
+                                >
+                                    <Play className="w-4 h-4" /> Launch Entire Collection ({sidebarQuestions.length})
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Question List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            {sidebarQuestions.length === 0 ? (
+                                <div className="text-center text-gray-400 text-sm mt-8">
+                                    {selectedCollectionId ? 'No questions in this collection.' : 'No questions yet.'}
+                                </div>
+                            ) : (
+                                sidebarQuestions.map(q => (
+                                    <div key={q.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-300 transition shadow-sm">
+                                        <p className="text-gray-900 font-medium mb-1">{q.text}</p>
+                                        {q.collection_name && (
+                                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full inline-block mb-3">
+                                                {q.collection_name}
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={() => launchQuestion(q.id)}
+                                            data-testid={`launch-question-button-${q.id}`}
+                                            className="w-full py-2 bg-blue-50 text-blue-700 font-medium rounded-md hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            <Play className="w-4 h-4" /> Launch to Students
+                                        </button>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 )}
 
                 {/* Right Area: Results */}
                 <div className={`${session?.status === 'active' ? 'w-2/3' : 'w-full'} flex flex-col h-full overflow-hidden bg-gray-50`}>
-                    <div className="p-4 border-b border-gray-200 bg-white shadow-sm z-10">
+                    <div className="p-4 border-b border-gray-200 bg-white shadow-sm z-10 flex justify-between items-center">
                         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                             <Users className="w-5 h-5 text-gray-400" />
                             Live Results
                         </h2>
+                        <div className="flex items-center gap-2">
+                            {hasOpenQuestions && session?.status === 'active' && (
+                                <button
+                                    onClick={closeAllQuestions}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 text-sm font-medium rounded-lg hover:bg-orange-100 transition border border-orange-200"
+                                >
+                                    <StopCircle className="w-4 h-4" /> Close All
+                                </button>
+                            )}
+                            {results.length > 0 && (
+                                <button
+                                    onClick={downloadCSV}
+                                    data-testid="download-csv-button"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition border border-gray-200"
+                                >
+                                    <Download className="w-4 h-4" /> Download CSV
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -237,6 +371,7 @@ const SessionLive = () => {
                                     {r.status === 'open' && (
                                         <button
                                             onClick={() => closeQuestion(r.id)}
+                                            data-testid={`close-question-button-${r.id}`}
                                             className="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 flex items-center gap-2 text-sm"
                                         >
                                             <Square className="w-4 h-4" /> Close
@@ -248,38 +383,24 @@ const SessionLive = () => {
                                 <div className="mb-8">
                                     <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">AI Score Distribution</h4>
 
-                                    {/* The graph container */}
                                     <div className="flex items-end h-40 gap-4 mt-8 pb-6 border-b border-gray-100">
                                         {[1, 2, 3, 4].map(score => {
-                                            // 1. Calculate how many responses got this score
                                             const count = r.responses?.filter(resp => Number(resp.ai_score) === Number(score)).length || 0;
-
-                                            // 2. What is the highest bin count? (Minimum 5 units so the graph doesn't look instantly 100% full on 1 vote)
                                             const counts = [1, 2, 3, 4].map(s => r.responses?.filter(resp => Number(resp.ai_score) === Number(s)).length || 0);
                                             const maxPeak = Math.max(...counts, 5);
-
-                                            // 3. Transform literal count into a percentage of the peak
-                                            const percHeight = Math.max((count / maxPeak) * 100, 2); // At least 2% so it's a visible nub
+                                            const percHeight = Math.max((count / maxPeak) * 100, 2);
 
                                             return (
                                                 <div key={score} className="flex-1 flex flex-col items-center justify-end h-full gap-3 relative">
-
-                                                    {/* Count Label (floats above the bar) */}
                                                     <span className={`text-sm font-bold absolute -top-6 ${count > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
                                                         {count}
                                                     </span>
-
-                                                    {/* The structural Track/Bar wrapper */}
                                                     <div className="w-full h-full bg-gray-50 rounded-t-md relative flex items-end overflow-hidden border border-gray-100/50">
-
-                                                        {/* The actual colored bar filling up from the bottom */}
                                                         <div
                                                             className={`w-full rounded-t-md transition-all duration-700 ease-out ${count > 0 ? 'bg-blue-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]' : 'bg-transparent'}`}
                                                             style={{ height: `${percHeight}%` }}
                                                         ></div>
                                                     </div>
-
-                                                    {/* Score Label Axis */}
                                                     <span className="text-xs font-semibold text-gray-500 tracking-wide uppercase">Score {score}</span>
                                                 </div>
                                             )
@@ -293,7 +414,10 @@ const SessionLive = () => {
                                     <div className="space-y-3">
                                         {r.responses?.map(resp => (
                                             <details key={resp.id} className="group bg-gray-50 border border-gray-200 rounded-lg">
-                                                <summary className="px-4 py-3 font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center group-open:border-b border-gray-200">
+                                                <summary
+                                                    data-testid={`student-response-summary-${resp.student_name}`}
+                                                    className="px-4 py-3 font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center group-open:border-b border-gray-200"
+                                                >
                                                     <div className="flex items-center gap-3">
                                                         {resp.student_name}
                                                         <span className="bg-white px-2 py-0.5 rounded text-xs font-bold border font-mono">
@@ -334,6 +458,7 @@ const SessionLive = () => {
                 show={showNewQuestionModal}
                 onClose={() => setShowNewQuestionModal(false)}
                 onSave={handleCreateQuestion}
+                collections={collections}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
